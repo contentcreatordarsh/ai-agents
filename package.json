@@ -1,0 +1,32 @@
+{
+  "name": "ai-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simple TypeScript task agents with Daytona execution",
+  "bin": {
+    "ai-agents": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "expense-summary": "tsx src/cli.ts expense-summary",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@daytona/sdk": "^0.200.1",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "openai": "^6.49.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}

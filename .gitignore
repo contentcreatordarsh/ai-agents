@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+reports/*.md
+!reports/.gitkeep
+data/expenses/*
+!data/expenses/.gitkeep
+!data/expenses/sample*.csv
+*.log
