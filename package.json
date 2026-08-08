@@ -12,6 +12,7 @@
     "dev": "tsx src/cli.ts",
     "expense-summary": "tsx src/cli.ts expense-summary",
     "deploy:github-times": "tsx scripts/deploy-github-times-daytona.ts",
+    "snapshot:github-times": "tsx scripts/create-github-times-snapshot.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

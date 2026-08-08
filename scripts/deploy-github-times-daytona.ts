@@ -1,168 +1,110 @@
 #!/usr/bin/env npx tsx
 /**
  * Deploy The GitHub Times into a Daytona sandbox and print a signed preview URL.
- *
- * Requires DAYTONA_API_KEY in the environment (or .env).
+ * Uses snapshot cursor-github-times-v1 when available (fast path).
  */
 import "dotenv/config";
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { Daytona } from "@daytona/sdk";
-
-const PORT = 3000;
-const APP_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../github-times",
-);
-const ARCHIVE = "/tmp/github-times-deploy.tgz";
+import {
+  createDaytonaClient,
+  ensureLocalBuild,
+  GITHUB_TIMES_PORT,
+  GITHUB_TIMES_SNAPSHOT,
+  packGithubTimesArchive,
+  provisionGithubTimesInSandbox,
+  startGithubTimesServer,
+  waitForGithubTimesHealthy,
+  writeGithubTokenEnv,
+} from "./lib/github-times-sandbox.js";
+import type { Sandbox } from "@daytona/sdk";
 
 function log(section: string, message: string) {
   console.log(`\n=== ${section} ===\n${message}`);
 }
 
-async function main() {
-  const apiKey = process.env.DAYTONA_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "DAYTONA_API_KEY is not set. Add it at https://app.daytona.io/dashboard/keys",
-    );
-  }
-
-  if (!existsSync(APP_DIR)) {
-    throw new Error(`App directory not found: ${APP_DIR}`);
-  }
-
-  const nextDir = path.join(APP_DIR, ".next");
-  if (!existsSync(nextDir)) {
-    log("Build", "Building locally (sandbox OOM-safe prebuild)…");
-    execSync("npm ci && npm run build", {
-      cwd: APP_DIR,
-      stdio: "inherit",
+async function createSandboxFromSnapshot(
+  daytona: ReturnType<typeof createDaytonaClient>,
+  snapshotName: string,
+): Promise<Sandbox | null> {
+  try {
+    const snap = await daytona.snapshot.get(snapshotName);
+    if (snap.state !== "active") {
+      console.warn(`Snapshot "${snapshotName}" state is ${snap.state}; using full provision.`);
+      return null;
+    }
+    return await daytona.create({
+      snapshot: snapshotName,
+      language: "typescript",
+      autoDeleteInterval: 120,
+      public: true,
     });
-  } else {
-    log("Build", "Using existing local .next production build.");
+  } catch {
+    return null;
+  }
+}
+
+async function main() {
+  const daytona = createDaytonaClient();
+  const snapshotName =
+    process.env.DAYTONA_SNAPSHOT ?? GITHUB_TIMES_SNAPSHOT;
+  const useSnapshot = process.env.DAYTONA_SKIP_SNAPSHOT !== "true";
+
+  let sandbox: Sandbox | null = null;
+  let provisionMode: "snapshot" | "full" = "full";
+
+  if (useSnapshot) {
+    log("Snapshot", `Trying snapshot "${snapshotName}"…`);
+    sandbox = await createSandboxFromSnapshot(daytona, snapshotName);
+    if (sandbox) provisionMode = "snapshot";
   }
 
-  log("Pack", `Creating archive from ${APP_DIR} (includes .next, excludes node_modules)…`);
-  execSync(
-    `tar -czf ${ARCHIVE} --exclude=node_modules -C ${path.dirname(APP_DIR)} ${path.basename(APP_DIR)}`,
-    { stdio: "inherit" },
-  );
-
-  const daytona = new Daytona({
-    apiKey,
-    ...(process.env.DAYTONA_API_URL
-      ? { apiUrl: process.env.DAYTONA_API_URL }
-      : {}),
-    ...(process.env.DAYTONA_TARGET
-      ? { target: process.env.DAYTONA_TARGET }
-      : {}),
-  });
-
-  log("Sandbox", "Creating Daytona sandbox (Node/TypeScript)…");
-  const sandbox = await daytona.create({
-    language: "typescript",
-    autoDeleteInterval: 120,
-    public: true,
-  });
+  if (!sandbox) {
+    log("Build", "Snapshot unavailable — full provision path…");
+    ensureLocalBuild();
+    packGithubTimesArchive();
+    log("Sandbox", "Creating fresh Daytona sandbox…");
+    sandbox = await daytona.create({
+      language: "typescript",
+      autoDeleteInterval: 120,
+      public: true,
+    });
+    await provisionGithubTimesInSandbox(sandbox);
+  }
 
   const sandboxId = sandbox.id;
-  console.log(`Sandbox ID: ${sandboxId}`);
+  console.log(`Sandbox ID: ${sandboxId} (${provisionMode})`);
 
   try {
-    log("Upload", "Uploading application archive…");
-    await sandbox.fs.uploadFile(ARCHIVE, "github-times.tgz");
-
-    log("Setup", "Extracting and installing production dependencies (no in-sandbox build)…");
-    const setup = await sandbox.process.executeCommand(
-      [
-        "set -e",
-        "mkdir -p app && tar -xzf github-times.tgz -C app",
-        "cd app/github-times",
-        "npm ci --omit=dev",
-      ].join(" && "),
-      undefined,
-      undefined,
-      300,
+    const hasToken = await writeGithubTokenEnv(sandbox);
+    console.log(
+      hasToken
+        ? "GitHub token: written to .env.local (live API)"
+        : "GitHub token: not set",
     );
 
-    if (setup.exitCode !== 0) {
-      throw new Error(`Setup failed:\n${setup.result}`);
-    }
-    console.log(setup.result.slice(-500));
-
-    if (process.env.GITHUB_TOKEN) {
-      await sandbox.fs.uploadFile(
-        Buffer.from(`GITHUB_TOKEN=${process.env.GITHUB_TOKEN}\n`, "utf8"),
-        "app/github-times/.env.local",
-      );
-      console.log("GitHub token: written to sandbox .env.local (live API enabled)");
-    } else {
-      console.log("GitHub token: not set (may use mock fallback on rate limits)");
-    }
-
-    log("Start", `Starting Next.js on port ${PORT}…`);
-    const start = await sandbox.process.executeCommand(
-      `cd app/github-times && nohup npm run start > /tmp/server.log 2>&1 & echo $!`,
-      undefined,
-      undefined,
-      30,
-    );
-    console.log(`Start PID: ${start.result.trim()}`);
+    log("Start", `Starting Next.js on port ${GITHUB_TIMES_PORT}…`);
+    const pid = await startGithubTimesServer(sandbox);
+    console.log(`Start PID: ${pid}`);
 
     log("Health", "Waiting for HTTP readiness…");
-    let healthy = false;
-    let healthOutput = "";
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const probe = await sandbox.process.executeCommand(
-        `curl -s -o /tmp/body.html -w "%{http_code}" http://127.0.0.1:${PORT}/ || true`,
-        undefined,
-        undefined,
-        15,
-      );
-      const code = probe.result.trim();
-      if (code === "200") {
-        healthy = true;
-        const body = await sandbox.process.executeCommand(
-          "head -c 1200 /tmp/body.html",
-          undefined,
-          undefined,
-          10,
-        );
-        healthOutput = body.result;
-        break;
-      }
-      console.log(`  attempt ${i + 1}: HTTP ${code}`);
-    }
+    const healthOutput = await waitForGithubTimesHealthy(sandbox);
 
-    if (!healthy) {
-      const logs = await sandbox.process.executeCommand(
-        "tail -80 /tmp/server.log || true",
-        undefined,
-        undefined,
-        10,
-      );
-      throw new Error(`Server did not become healthy.\n${logs.result}`);
-    }
-
-    const signed = await sandbox.getSignedPreviewUrl(PORT, 3600);
+    const signed = await sandbox.getSignedPreviewUrl(GITHUB_TIMES_PORT, 3600);
     const apiProbe = await sandbox.process.executeCommand(
-      `curl -s 'http://127.0.0.1:${PORT}/api/repos?range=daily' | head -c 600`,
+      `curl -s 'http://127.0.0.1:${GITHUB_TIMES_PORT}/api/repos?range=daily' | head -c 600`,
       undefined,
       undefined,
       20,
     );
 
     log("SUCCESS", [
+      `Provision mode: ${provisionMode}`,
+      `Snapshot: ${provisionMode === "snapshot" ? snapshotName : "n/a"}`,
       `Sandbox ID: ${sandboxId}`,
       `Daytona signed preview URL (valid 1 hour):`,
       signed.url,
       "",
-      "Homepage snippet (first 1200 chars):",
-      healthOutput,
+      "Homepage snippet:",
+      healthOutput.slice(0, 800),
       "",
       "API sample:",
       apiProbe.result,
@@ -174,7 +116,9 @@ async function main() {
         {
           sandboxId,
           previewUrl: signed.url,
-          port: PORT,
+          port: GITHUB_TIMES_PORT,
+          provisionMode,
+          snapshot: provisionMode === "snapshot" ? snapshotName : null,
           status: "running",
         },
         null,
