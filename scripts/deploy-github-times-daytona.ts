@@ -6,7 +6,7 @@
  */
 import "dotenv/config";
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Daytona } from "@daytona/sdk";
@@ -34,7 +34,18 @@ async function main() {
     throw new Error(`App directory not found: ${APP_DIR}`);
   }
 
-  log("Pack", `Creating archive from ${APP_DIR} (excluding node_modules)…`);
+  const nextDir = path.join(APP_DIR, ".next");
+  if (!existsSync(nextDir)) {
+    log("Build", "Building locally (sandbox OOM-safe prebuild)…");
+    execSync("npm ci && npm run build", {
+      cwd: APP_DIR,
+      stdio: "inherit",
+    });
+  } else {
+    log("Build", "Using existing local .next production build.");
+  }
+
+  log("Pack", `Creating archive from ${APP_DIR} (includes .next, excludes node_modules)…`);
   execSync(
     `tar -czf ${ARCHIVE} --exclude=node_modules -C ${path.dirname(APP_DIR)} ${path.basename(APP_DIR)}`,
     { stdio: "inherit" },
@@ -64,18 +75,17 @@ async function main() {
     log("Upload", "Uploading application archive…");
     await sandbox.fs.uploadFile(ARCHIVE, "github-times.tgz");
 
-    log("Setup", "Extracting, installing, and building…");
+    log("Setup", "Extracting and installing production dependencies (no in-sandbox build)…");
     const setup = await sandbox.process.executeCommand(
       [
         "set -e",
         "mkdir -p app && tar -xzf github-times.tgz -C app",
         "cd app/github-times",
-        "npm ci",
-        "npm run build",
+        "npm ci --omit=dev",
       ].join(" && "),
       undefined,
       undefined,
-      600,
+      300,
     );
 
     if (setup.exitCode !== 0) {
