@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f4f0e6;
+  --ink: #1a1a1a;
+  --ink-muted: #4a4a4a;
+  --newsprint-dark: #e8e2d4;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-newsprint-dark: var(--newsprint-dark);
+  --font-family-headline: var(--font-headline), Georgia, "Times New Roman", serif;
+  --font-family-body: var(--font-body), Georgia, "Times New Roman", serif;
+  --font-family-sans: var(--font-sans), system-ui, sans-serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+::selection {
+  background: #1a1a1a;
+  color: #f4f0e6;
+}
+
+a {
+  color: inherit;
+}
