@@ -99,12 +99,20 @@ function editionNumber(date = new Date()): number {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
+function encodeGithubQuery(q: string): string {
+  // GitHub qualifiers are joined with '+'; encodeURIComponent would turn '+' into '%2B' and break the query.
+  return q
+    .split("+")
+    .map((part) => encodeURIComponent(part))
+    .join("+");
+}
+
 async function fetchLiveRepos(
   range: TimeRange,
   language: string | null,
 ): Promise<RepoItem[] | null> {
   const q = buildQuery(range, language);
-  const url = `${GITHUB_API}?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=30`;
+  const url = `${GITHUB_API}?q=${encodeGithubQuery(q)}&sort=stars&order=desc&per_page=30`;
 
   const headers: HeadersInit = {
     Accept: "application/vnd.github+json",

@@ -93,6 +93,16 @@ async function main() {
     }
     console.log(setup.result.slice(-500));
 
+    if (process.env.GITHUB_TOKEN) {
+      await sandbox.fs.uploadFile(
+        Buffer.from(`GITHUB_TOKEN=${process.env.GITHUB_TOKEN}\n`, "utf8"),
+        "app/github-times/.env.local",
+      );
+      console.log("GitHub token: written to sandbox .env.local (live API enabled)");
+    } else {
+      console.log("GitHub token: not set (may use mock fallback on rate limits)");
+    }
+
     log("Start", `Starting Next.js on port ${PORT}…`);
     const start = await sandbox.process.executeCommand(
       `cd app/github-times && nohup npm run start > /tmp/server.log 2>&1 & echo $!`,
@@ -140,7 +150,7 @@ async function main() {
 
     const signed = await sandbox.getSignedPreviewUrl(PORT, 3600);
     const apiProbe = await sandbox.process.executeCommand(
-      `curl -s http://127.0.0.1:${PORT}/api/repos?range=daily | head -c 600`,
+      `curl -s 'http://127.0.0.1:${PORT}/api/repos?range=daily' | head -c 600`,
       undefined,
       undefined,
       20,
