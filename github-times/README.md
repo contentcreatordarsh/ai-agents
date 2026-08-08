@@ -34,3 +34,15 @@ npm run start
 ```
 
 Server binds to `0.0.0.0:3000` for Daytona port forwarding.
+
+## Daytona (from repo root)
+
+Snapshot naming: **`cursor-[project]-[version]`** → `cursor-github-times-v1`
+
+```bash
+cd ..
+npm run snapshot:github-times   # create / refresh snapshot
+npm run deploy:github-times     # deploy from snapshot (fast path)
+```
+
+Requires `DAYTONA_API_KEY` (+ `write:snapshots` to create snapshots). Optional `GITHUB_TOKEN` at deploy time (not baked into snapshot).
