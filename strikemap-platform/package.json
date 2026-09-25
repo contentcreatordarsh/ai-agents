@@ -8,7 +8,7 @@
     "dev:client": "vite --config client/vite.config.ts",
     "build": "npm run build:client && wrangler deploy --dry-run",
     "build:client": "vite build --config client/vite.config.ts",
-    "deploy": "npm run build:client && wrangler deploy",
+    "deploy": "npm run build:client && wrangler deploy --domain strikemap.space --domain www.strikemap.space",
     "db:migrate": "wrangler d1 migrations apply strikemap-db --local && wrangler d1 migrations apply strikemap-db --remote",
     "db:migrate:local": "wrangler d1 migrations apply strikemap-db --local",
     "db:seed": "wrangler d1 execute strikemap-db --local --file=./src/db/seed.sql",

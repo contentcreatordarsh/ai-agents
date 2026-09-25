@@ -8,7 +8,7 @@
 | Map UI (Next.js) | [`web/`](web/) | Static map / demo feed (edge + EC2 export) |
 | SE assignment / origin | [`origin/`](origin/), [`worker-strikemap/`](worker-strikemap/) | EC2 Flask origin, gateway Worker, tunnel, `/secure` |
 
-**Live:** https://strikemap.space · https://tunnel.strikemap.space
+**Live:** https://strikemap.space (game) · https://map.strikemap.space (intel map) · https://tunnel.strikemap.space/secure
 
 ### Run the game platform locally
 

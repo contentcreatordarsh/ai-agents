@@ -7,7 +7,8 @@ async function pbkdf2(password: string, salt: Uint8Array): Promise<ArrayBuffer> 
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   return crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 120_000, hash: "SHA-256" },
+    // Web Crypto in Workers caps PBKDF2 iterations at 100_000.
+    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
     key,
     256,
   );

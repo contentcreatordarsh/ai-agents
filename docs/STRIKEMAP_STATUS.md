@@ -10,37 +10,26 @@
 | Origin app | Flask + Next static export (`web_export/`) on nginx → :8080 |
 | Direct test | `curl -H "X-Test: 1" http://54.251.237.209/` |
 
-## Wrangler (done)
+## Workers (production — 2026-09-25)
 
-- Logged in as **darshan.p.hegde@gmail.com** (account `0fa4850c978886b80a15821863df3855`).
-- Worker **`se-stand-deliver-secure`** deployed on route `tunnel.strikemap.space/secure*`.
-- R2 bucket **`se-country-flags`** created; flag objects uploaded.
-- Tunnel **`strikemap-origin`** (`f9337053-4b87-4a78-ab07-14721d10eb53`) ingress → `http://127.0.0.1:8080`; **cloudflared** running on EC2.
+| Worker | Hostname | Role |
+|--------|----------|------|
+| **`strikemap-platform`** | https://strikemap.space , https://www.strikemap.space | PR #2 — game SPA, `/api/v1`, WebSockets, D1 `strikemap-db` (`d5b3d6c9-ef06-4a41-87b3-d87aa1d3f05c`), KV `8e95bff…`, queue `strikemap-game-events` |
+| **`strikemap-gateway`** | https://map.strikemap.space | PR #1 — Next map UI, `/api/geo`, votes |
+| **`se-stand-deliver-secure`** | https://tunnel.strikemap.space/secure* | PR #1 — R2 country flags (Zero Trust in front) |
 
-## Blocked: DNS API (Wrangler OAuth has no Zone DNS Edit)
+Redeploy: `docs/CLOUDFLARE_ROUTES_MANUAL.md`.
 
-Wrangler OAuth cannot create/edit DNS records (API returns auth error). Need **one** of:
+## DNS
 
-1. **API token** (recommended): Cloudflare dashboard → Profile → API Tokens → **Edit zone DNS** for `strikemap.space` only → set as `CLOUDFLARE_API_TOKEN` in this agent (tell the agent the token once), **or**
-2. **Manual DNS** (two records below) in the Cloudflare dashboard.
+- Apex **`@`** is a **Worker custom domain** (no `A` to EC2).
+- **`origin.strikemap.space`** → `54.251.237.209` (proxied) for Flask header echo + `web_export/`.
+- Tunnel **`strikemap-origin`** → EC2 `:8080` on `tunnel.strikemap.space`.
 
-## DNS target (when Wrangler/API is authorized)
+## Verified
 
-In Cloudflare for `strikemap.space`:
-
-1. Remove legacy Google `A` / `AAAA` on `@`.
-2. Add **A** `@` → `54.251.237.209` (**Proxied**).
-3. **CNAME** `www` → `strikemap.space` (**Proxied**).
-
-Then on EC2: `sudo certbot --nginx -d strikemap.space -d www.strikemap.space` (non-CF origin cert).
-
-## Next.js map UI (live scaffold)
-
-| Item | Detail |
-|------|--------|
-| Source | `web/` — Next 15, MapLibre, static export |
-| Edge | `worker-strikemap` (`strikemap-gateway`) assets via `infra/build-web-to-worker.sh` |
-| Origin | Same static files via `infra/deploy-origin-ec2.sh` → `origin/web_export/` |
-| Public URL | https://strikemap.space/ (map + demo feed) |
-| Legacy trainer | https://strikemap.space/trainer |
-| Worker routes | Attach `strikemap.space/*` in dashboard if Wrangler API fails (`docs/CLOUDFLARE_ROUTES_MANUAL.md`) |
+```bash
+curl -sS https://strikemap.space/api/v1/health
+curl -sS https://map.strikemap.space/api/geo
+curl -sS https://origin.strikemap.space/debug/headers
+```

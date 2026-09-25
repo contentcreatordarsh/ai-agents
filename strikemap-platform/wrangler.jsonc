@@ -19,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "strikemap-db",
-      "database_id": "00000000-0000-0000-0000-000000000001",
+      "database_id": "d5b3d6c9-ef06-4a41-87b3-d87aa1d3f05c",
       "migrations_dir": "src/db/migrations"
     }
   ],
@@ -52,9 +52,5 @@
   "ai": {
     "binding": "AI"
   },
-  "routes": [
-    { "pattern": "strikemap.space/*", "zone_name": "strikemap.space" },
-    { "pattern": "www.strikemap.space/*", "zone_name": "strikemap.space" },
-    { "pattern": "api.strikemap.space/*", "zone_name": "strikemap.space" }
-  ]
+  "workers_dev": false
 }

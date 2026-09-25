@@ -3,13 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 account_id = "0fa4850c978886b80a15821863df3855"
 
-[[routes]]
-pattern = "strikemap.space/*"
-zone_name = "strikemap.space"
-
-[[routes]]
-pattern = "www.strikemap.space/*"
-zone_name = "strikemap.space"
+# Legacy Next map UI (PR #1) on map.strikemap.space — apex is strikemap-platform.
 
 [[kv_namespaces]]
 binding = "VOTES"
@@ -21,3 +15,6 @@ ORIGIN_HOST = "54.251.237.209"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+[[custom_domains]]
+domain = "map.strikemap.space"
