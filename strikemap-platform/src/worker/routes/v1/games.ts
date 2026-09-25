@@ -98,8 +98,9 @@ v1GameRoutes.post("/", async (c) => {
     }),
   );
 
+  const joinUrl = `https://strikemap.space/join/${code}`;
   return apiOk(c, {
-    game: { id: gameId, code, status: "LOBBY" as const },
+    game: { id: gameId, code, status: "LOBBY" as const, name: body.name, joinUrl },
   });
 });
 

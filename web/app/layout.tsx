@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StrikeMap — Live conflict intelligence (demo)",
+  title: "StrikeMap — Your city. Your battlefield.",
   description:
-    "StrikeMap on strikemap.space — map UI scaffold with edge Workers and AWS EC2 origin.",
+    "Real-world multiplayer City Battle on strikemap.space — Cloudflare Workers, Durable Objects, and tactical maps.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

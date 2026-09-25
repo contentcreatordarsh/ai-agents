@@ -2,11 +2,15 @@
   "name": "strikemap-gateway",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy"
+    "check": "tsc --noEmit",
+    "deploy": "wrangler deploy --domain strikemap.space --domain www.strikemap.space --domain map.strikemap.space"
+  },
+  "dependencies": {
+    "hono": "^4.9.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260923.1",
     "typescript": "^5.7.3",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.140.0"
   }
 }

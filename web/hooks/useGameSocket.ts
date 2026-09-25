@@ -1,8 +1,12 @@
+"use client";
+
 import { useEffect, useRef, useState } from "react";
-import type { GameMessage, GameStatePayload } from "../../../src/shared/contracts/events";
-import { WS_PROTOCOL_VERSION } from "../../../src/shared/contracts/events";
-import { api, getToken } from "../lib/api";
-import type { TeamColor } from "../../../src/shared/contracts/game";
+import { api } from "@/lib/game/api";
+import {
+  WS_PROTOCOL_VERSION,
+  type GameMessage,
+  type GameStatePayload,
+} from "@/lib/game/contracts";
 
 export type ConnStatus = "live" | "reconnecting" | "offline";
 
@@ -19,7 +23,7 @@ export function useGameSocket(opts: {
   const retryRef = useRef(0);
 
   useEffect(() => {
-    if (!opts.enabled) return;
+    if (!opts.enabled || !opts.gameId) return;
     let cancelled = false;
     let watchId: number | null = null;
 
@@ -66,19 +70,23 @@ export function useGameSocket(opts: {
         }
         if (msg.sequence) lastSequenceRef.current = msg.sequence;
         if (msg.type === "GAME_STATE") setSnapshot(msg.payload as GameStatePayload);
+        if (msg.type === "PLAYER_MOVED") {
+          const p = msg.payload as { playerId: string };
+          setEvents((e) => [`📍 ${p.playerId} moved`, ...e].slice(0, 8));
+        }
         if (msg.type === "TERRITORY_CAPTURED") {
           const p = msg.payload as { territoryId: string; newOwner: string };
           setEvents((e) => [`⚡ ${p.territoryId} → ${p.newOwner}`, ...e].slice(0, 8));
         }
-        if (msg.type === "NOTIFICATION" || msg.type === "OBJECTIVE_CREATED") {
-          setEvents((e) => [JSON.stringify(msg.payload), ...e].slice(0, 8));
+        if (msg.type === "SCORE_UPDATED") {
+          setEvents((e) => [`🏆 Score update`, ...e].slice(0, 8));
         }
       };
     };
 
     void connect();
 
-    if (navigator.geolocation && !opts.demo && getToken()) {
+    if (navigator.geolocation && !opts.demo) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const ws = wsRef.current;
@@ -94,22 +102,22 @@ export function useGameSocket(opts: {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 accuracyM: pos.coords.accuracy,
-                timestamp: new Date().toISOString(),
+                timestamp: new Date(pos.timestamp).toISOString(),
               },
             }),
           );
         },
-        () => undefined,
+        () => {},
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 },
       );
     }
 
     return () => {
       cancelled = true;
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       wsRef.current?.close();
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
-  }, [opts.gameId, opts.demo, opts.enabled]);
+  }, [opts.enabled, opts.gameId, opts.demo]);
 
   return { snapshot, status, events };
 }

@@ -1,5 +1,5 @@
-import HomeClient from "./HomeClient";
+import GameLanding from "@/components/game/GameLanding";
 
 export default function HomePage() {
-  return <HomeClient />;
+  return <GameLanding />;
 }
