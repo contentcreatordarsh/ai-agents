@@ -3,6 +3,11 @@ origin/__pycache__/
 worker/node_modules/
 worker-geo/node_modules/
 worker-strikemap/node_modules/
+worker-strikemap/public/_next/
+worker-strikemap/public/404/
+worker-strikemap/public/404.html
+worker-strikemap/public/index.html
+worker-strikemap/public/index.txt
 web/node_modules/
 web/out/
 web/.next/
