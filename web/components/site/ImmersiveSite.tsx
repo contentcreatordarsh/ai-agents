@@ -18,6 +18,7 @@ import ContactSection from "./ContactSection";
 import SiteFooter from "./SiteFooter";
 import SiteModals from "./SiteModals";
 import ExperienceShell from "@/components/world/ExperienceShell";
+import SiteErrorBoundary from "./SiteErrorBoundary";
 
 const INTRO_KEY = "strikemap_intro_seen_v3";
 
@@ -48,6 +49,7 @@ export default function ImmersiveSite() {
   }
 
   return (
+    <SiteErrorBoundary>
     <SiteUIProvider>
       {showIntro ? <IntroLoader onComplete={finishIntro} /> : null}
       {entered ? (
@@ -77,5 +79,6 @@ export default function ImmersiveSite() {
       ) : null}
       {entered ? <SiteModals /> : null}
     </SiteUIProvider>
+    </SiteErrorBoundary>
   );
 }

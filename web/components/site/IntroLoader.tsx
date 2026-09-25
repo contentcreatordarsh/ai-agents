@@ -1,9 +1,16 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type BootLine = { label: string; ok: boolean };
+
+const BOOT_CHECKS: BootLine[] = [
+  { label: "GEOSPATIAL SYSTEM", ok: true },
+  { label: "PLAYER NETWORK", ok: true },
+  { label: "TERRITORY ENGINE", ok: true },
+  { label: "MATCH SYSTEM", ok: true },
+];
 
 type Props = {
   onComplete: () => void;
@@ -13,41 +20,55 @@ export default function IntroLoader({ onComplete }: Props) {
   const [phase, setPhase] = useState<"signal" | "boot" | "ready">("signal");
   const [lines, setLines] = useState<BootLine[]>([]);
   const [exiting, setExiting] = useState(false);
+  const runId = useRef(0);
+
+  const startBoot = () => {
+    setLines([]);
+    setPhase("boot");
+  };
 
   useEffect(() => {
     if (phase !== "boot") return;
 
-    const checks: BootLine[] = [
-      { label: "GEOSPATIAL SYSTEM", ok: typeof window !== "undefined" && "geolocation" in navigator },
-      { label: "PLAYER NETWORK", ok: typeof navigator !== "undefined" && navigator.onLine },
-      { label: "TERRITORY ENGINE", ok: true },
-      { label: "MATCH SYSTEM", ok: true },
-    ];
-
-    let i = 0;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const tick = () => {
-      if (i < checks.length) {
-        setLines((prev) => [...prev, checks[i]]);
-        i += 1;
-        timers.push(setTimeout(tick, 520));
-      } else {
-        void fetch("/api/v1/health", { method: "GET" })
-          .then((r) => r.ok)
-          .catch(() => false)
-          .finally(() => {
-            timers.push(setTimeout(() => setPhase("ready"), 400));
-          });
+    const id = ++runId.current;
+    const checks: BootLine[] = BOOT_CHECKS.map((row) => {
+      if (row.label === "GEOSPATIAL SYSTEM") {
+        return { ...row, ok: typeof navigator !== "undefined" && "geolocation" in navigator };
       }
+      if (row.label === "PLAYER NETWORK") {
+        return { ...row, ok: typeof navigator !== "undefined" && navigator.onLine };
+      }
+      return row;
+    });
+
+    let cancelled = false;
+
+    (async () => {
+      for (const check of checks) {
+        if (cancelled || runId.current !== id) return;
+        setLines((prev) => [...prev, check]);
+        await new Promise((r) => setTimeout(r, 480));
+      }
+      if (cancelled || runId.current !== id) return;
+      try {
+        await fetch("/api/v1/health", { method: "GET" });
+      } catch {
+        /* edge may be offline — still allow entry */
+      }
+      if (!cancelled && runId.current === id) setPhase("ready");
+    })();
+
+    return () => {
+      cancelled = true;
     };
-    timers.push(setTimeout(tick, 300));
-    return () => timers.forEach(clearTimeout);
   }, [phase]);
 
   const enter = () => {
     setExiting(true);
     setTimeout(onComplete, 900);
   };
+
+  const safeLines = lines.filter((l): l is BootLine => Boolean(l?.label));
 
   return (
     <AnimatePresence>
@@ -79,7 +100,7 @@ export default function IntroLoader({ onComplete }: Props) {
             <motion.button
               type="button"
               className="btn-cta intro-enter"
-              onClick={() => setPhase("boot")}
+              onClick={startBoot}
             >
               ENTER THE BATTLEFIELD
             </motion.button>
@@ -89,7 +110,7 @@ export default function IntroLoader({ onComplete }: Props) {
             <div className="intro-boot" aria-live="polite">
               <p className="intro-boot-title">INITIALIZING BATTLEFIELD</p>
               <ul>
-                {lines.map((l) => (
+                {safeLines.map((l) => (
                   <li key={l.label}>
                     <span>{l.label}</span>
                     <span className={l.ok ? "online" : "offline"}>{l.ok ? "ONLINE" : "OFFLINE"}</span>
