@@ -110,5 +110,35 @@ export default function GameMap({ snapshot, center }: Props) {
     });
   }, [snapshot]);
 
-  return <div ref={ref} className="game-map" />;
+  const sector = snapshot?.territories.find((t) => t.id === "sector_01");
+
+  return (
+    <div className="game-map-wrap">
+      <div ref={ref} className="game-map" />
+      {sector ? (
+        <div className="sector-label glass">
+          <div>⬡ SECTOR 01</div>
+          <div>{sector.captureProgress}% CAPTURE</div>
+          {sector.ownerTeam ? <div>{sector.ownerTeam} CONTROL</div> : null}
+        </div>
+      ) : null}
+      <style jsx>{`
+        .game-map-wrap {
+          position: absolute;
+          inset: 0;
+        }
+        .sector-label {
+          position: absolute;
+          left: 50%;
+          top: 42%;
+          transform: translate(-50%, -50%);
+          padding: 0.5rem 0.75rem;
+          text-align: center;
+          font-size: 0.8rem;
+          pointer-events: none;
+          z-index: 1;
+        }
+      `}</style>
+    </div>
+  );
 }

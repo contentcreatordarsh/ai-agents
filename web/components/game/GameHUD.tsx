@@ -31,11 +31,14 @@ export default function GameHUD({ snapshot, status, events }: Props) {
           {demo ? <span className="demo-pill">DEMO MODE</span> : null}
         </div>
         <div className="scores">
-          {(snapshot?.teams ?? []).map((t) => (
-            <span key={t.color} style={{ color: TEAM_COLORS[t.color as TeamColor] }}>
-              {t.score.toLocaleString()}
-            </span>
-          ))}
+          {(["RED", "BLUE"] as const).map((color) => {
+            const t = snapshot?.teams.find((x) => x.color === color);
+            return (
+              <span key={color} style={{ color: TEAM_COLORS[color] }}>
+                {color === "RED" ? "🔴" : "🔵"} {(t?.score ?? 0).toLocaleString()}
+              </span>
+            );
+          })}
         </div>
         <div className="timer">
           ⏱ {formatTime(remaining)} · {statusLabel}

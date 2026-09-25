@@ -34,7 +34,11 @@ function JoinInner() {
       await ensureAuth();
       const lookup = await api<{ game: { id: string } }>(`/api/v1/games/join/${code}`);
       const gameId = lookup.game.id;
-      await api(`/api/v1/games/${gameId}/join`, { method: "POST", body: "{}" });
+      const joined = await api<{ message?: string }>(`/api/v1/games/${gameId}/join`, {
+        method: "POST",
+        body: "{}",
+      });
+      if (joined.message) alert(joined.message);
       router.push(`/battle/play/?id=${gameId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Join failed");

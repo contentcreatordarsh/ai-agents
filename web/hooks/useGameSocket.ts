@@ -6,6 +6,7 @@ import {
   WS_PROTOCOL_VERSION,
   type GameMessage,
   type GameStatePayload,
+  type TeamColor,
 } from "@/lib/game/contracts";
 
 export type ConnStatus = "live" | "reconnecting" | "offline";
@@ -18,6 +19,7 @@ export function useGameSocket(opts: {
   const [snapshot, setSnapshot] = useState<GameStatePayload | null>(null);
   const [status, setStatus] = useState<ConnStatus>("offline");
   const [events, setEvents] = useState<string[]>([]);
+  const [finished, setFinished] = useState<{ winner: TeamColor; scores: Record<string, number> } | null>(null);
   const lastSequenceRef = useRef(0);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -69,17 +71,69 @@ export function useGameSocket(opts: {
           );
         }
         if (msg.sequence) lastSequenceRef.current = msg.sequence;
+
         if (msg.type === "GAME_STATE") setSnapshot(msg.payload as GameStatePayload);
+
         if (msg.type === "PLAYER_MOVED") {
-          const p = msg.payload as { playerId: string };
-          setEvents((e) => [`📍 ${p.playerId} moved`, ...e].slice(0, 8));
+          const p = msg.payload as {
+            playerId: string;
+            username?: string;
+            location: { lat: number; lng: number };
+            team: TeamColor;
+          };
+          setSnapshot((prev) => {
+            if (!prev) return prev;
+            const players = prev.players.map((pl) =>
+              pl.id === p.playerId
+                ? {
+                    ...pl,
+                    location: { ...p.location, updatedAt: new Date().toISOString() },
+                  }
+                : pl,
+            );
+            return { ...prev, players };
+          });
         }
-        if (msg.type === "TERRITORY_CAPTURED") {
-          const p = msg.payload as { territoryId: string; newOwner: string };
-          setEvents((e) => [`⚡ ${p.territoryId} → ${p.newOwner}`, ...e].slice(0, 8));
+
+        if (msg.type === "TERRITORY_UPDATED" || msg.type === "TERRITORY_CAPTURED") {
+          const t = msg.payload as { territory?: GameStatePayload["territories"][0]; territoryId?: string; newOwner?: string };
+          if (msg.type === "TERRITORY_CAPTURED") {
+            setEvents((e) => [`⚡ SECTOR CAPTURED · ${t.newOwner} +250`, ...e].slice(0, 6));
+          }
+          setSnapshot((prev) => {
+            if (!prev) return prev;
+            const territory = (t as { territory?: GameStatePayload["territories"][0] }).territory;
+            if (territory) {
+              const territories = prev.territories.map((x) => (x.id === territory.id ? { ...x, ...territory } : x));
+              return { ...prev, territories };
+            }
+            if (t.territoryId && t.newOwner) {
+              const territories = prev.territories.map((x) =>
+                x.id === t.territoryId
+                  ? { ...x, ownerTeam: t.newOwner as TeamColor, captureProgress: 100, status: "CONTROLLED" as const }
+                  : x,
+              );
+              return { ...prev, territories };
+            }
+            return prev;
+          });
         }
+
         if (msg.type === "SCORE_UPDATED") {
-          setEvents((e) => [`🏆 Score update`, ...e].slice(0, 8));
+          const sc = (msg.payload as { scores: Record<string, number> }).scores;
+          setSnapshot((prev) => {
+            if (!prev) return prev;
+            const teams = prev.teams.map((tm) => ({
+              ...tm,
+              score: sc[tm.color] ?? tm.score,
+            }));
+            return { ...prev, teams };
+          });
+        }
+
+        if (msg.type === "GAME_FINISHED") {
+          const p = msg.payload as { winnerTeam: TeamColor; finalScores: Record<string, number> };
+          setFinished({ winner: p.winnerTeam, scores: p.finalScores });
         }
       };
     };
@@ -119,5 +173,25 @@ export function useGameSocket(opts: {
     };
   }, [opts.enabled, opts.gameId, opts.demo]);
 
-  return { snapshot, status, events };
+  const sendSimulatedMove = (lat: number, lng: number) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(
+      JSON.stringify({
+        type: "PLAYER_MOVE",
+        eventId: crypto.randomUUID(),
+        serverTime: new Date().toISOString(),
+        gameId: opts.gameId,
+        sequence: 0,
+        payload: {
+          lat,
+          lng,
+          accuracyM: 12,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    );
+  };
+
+  return { snapshot, status, events, finished, sendSimulatedMove };
 }

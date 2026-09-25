@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api, setToken, getToken } from "@/lib/game/api";
 
 export default function CreateBattlePage() {
+  const router = useRouter();
+  const [name, setName] = useState("Singapore Battle");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("Singapore City Battle");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ id: string; code: string; joinUrl?: string } | null>(
-    null,
-  );
 
   async function ensureAuth() {
     if (getToken()) return;
@@ -28,24 +27,12 @@ export default function CreateBattlePage() {
     try {
       await ensureAuth();
       const data = await api<{
-        game: { id: string; code: string; joinUrl?: string };
+        game: { id: string; code: string };
       }>("/api/v1/games", {
         method: "POST",
-        body: JSON.stringify({
-          name,
-          mode: "CITY_BATTLE",
-          center: { lat: 1.3521, lng: 103.8198 },
-          radiusM: 5000,
-          durationSeconds: 3600,
-          teamCount: 4,
-          maxPlayers: 32,
-        }),
+        body: JSON.stringify({ name }),
       });
-      setResult(data.game);
-      await api(`/api/v1/games/${data.game.id}/join`, {
-        method: "POST",
-        body: JSON.stringify({ team: "RED" }),
-      });
+      router.push(`/battle/play/?id=${data.game.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed");
     }
@@ -54,10 +41,10 @@ export default function CreateBattlePage() {
   return (
     <div className="form-page">
       <Link href="/">← StrikeMap</Link>
-      <h1>Create City Battle</h1>
+      <h1>CITY BATTLE</h1>
+      <p>Battle name</p>
       {!getToken() ? (
         <section className="glass">
-          <h2>Sign up / sign in</h2>
           <label>
             Email
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
@@ -67,7 +54,7 @@ export default function CreateBattlePage() {
             <input value={username} onChange={(e) => setUsername(e.target.value)} />
           </label>
           <label>
-            Password
+            Password (8+ chars)
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -77,23 +64,11 @@ export default function CreateBattlePage() {
         </section>
       ) : null}
       <section className="glass">
-        <label>
-          Battle name
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
+        <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Battle name" />
         <button type="button" className="btn primary" onClick={() => void onCreate()}>
-          Create battle
+          CREATE BATTLE
         </button>
         {error ? <p className="err">{error}</p> : null}
-        {result ? (
-          <div className="success">
-            <p>Code: <strong>{result.code}</strong></p>
-            <p>
-              <Link href={`/battle/play/?id=${result.id}`}>Enter lobby →</Link>
-            </p>
-            {result.joinUrl ? <p>Share: {result.joinUrl}</p> : null}
-          </div>
-        ) : null}
       </section>
     </div>
   );
