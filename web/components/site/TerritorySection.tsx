@@ -25,7 +25,7 @@ export default function TerritorySection() {
   }, [progress]);
 
   return (
-    <section id="territory" className="section territory-section" ref={ref}>
+    <section id="territory" className="section territory-section scene-panel" ref={ref}>
       <h2 className="section-title">TAKE THE <span className="outline">SECTOR.</span></h2>
       <div className="territory-stage">
         <motion.div

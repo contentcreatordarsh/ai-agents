@@ -8,7 +8,7 @@ export default function MultiplayerSection() {
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   return (
-    <section id="multiplayer" className="section mp-section" ref={ref}>
+    <section id="multiplayer" className="section mp-section scene-panel" ref={ref}>
       <motion.h2
         className="section-title"
         initial={{ opacity: 0, y: 40 }}

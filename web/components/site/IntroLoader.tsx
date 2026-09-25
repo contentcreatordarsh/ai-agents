@@ -3,32 +3,46 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 
-const STEPS = [
-  "INITIALIZING BATTLEFIELD",
-  "LOADING CITY DATA",
-  "CONNECTING TO EDGE",
-  "READY",
-];
+type BootLine = { label: string; ok: boolean };
 
 type Props = {
   onComplete: () => void;
 };
 
 export default function IntroLoader({ onComplete }: Props) {
-  const [started, setStarted] = useState(false);
-  const [step, setStep] = useState(0);
-  const [ready, setReady] = useState(false);
+  const [phase, setPhase] = useState<"signal" | "boot" | "ready">("signal");
+  const [lines, setLines] = useState<BootLine[]>([]);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    if (!started) return;
+    if (phase !== "boot") return;
+
+    const checks: BootLine[] = [
+      { label: "GEOSPATIAL SYSTEM", ok: typeof window !== "undefined" && "geolocation" in navigator },
+      { label: "PLAYER NETWORK", ok: typeof navigator !== "undefined" && navigator.onLine },
+      { label: "TERRITORY ENGINE", ok: true },
+      { label: "MATCH SYSTEM", ok: true },
+    ];
+
+    let i = 0;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    STEPS.forEach((_, i) => {
-      timers.push(setTimeout(() => setStep(i), 400 + i * 650));
-    });
-    timers.push(setTimeout(() => setReady(true), 400 + STEPS.length * 650));
+    const tick = () => {
+      if (i < checks.length) {
+        setLines((prev) => [...prev, checks[i]]);
+        i += 1;
+        timers.push(setTimeout(tick, 520));
+      } else {
+        void fetch("/api/v1/health", { method: "GET" })
+          .then((r) => r.ok)
+          .catch(() => false)
+          .finally(() => {
+            timers.push(setTimeout(() => setPhase("ready"), 400));
+          });
+      }
+    };
+    timers.push(setTimeout(tick, 300));
     return () => timers.forEach(clearTimeout);
-  }, [started]);
+  }, [phase]);
 
   const enter = () => {
     setExiting(true);
@@ -52,51 +66,48 @@ export default function IntroLoader({ onComplete }: Props) {
             style={{ position: "relative", zIndex: 1 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
           >
             STRIKEMAP
           </motion.p>
           <div className="intro-tags">
-            {["REAL WORLD", "LIVE MULTIPLAYER", "CITY BATTLE"].map((t, i) => (
-              <motion.span
-                key={t}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.12 }}
-              >
-                {t}
-              </motion.span>
+            {["REAL WORLD", "MULTIPLAYER", "TERRITORY BATTLE"].map((t) => (
+              <span key={t}>{t}</span>
             ))}
           </div>
-          <div className="intro-status" aria-live="polite">
-            {started ? <span className="intro-pulse" /> : null}
-            {started ? STEPS[step] : "AWAITING DEPLOYMENT"}
-          </div>
-          {!started ? (
+
+          {phase === "signal" ? (
             <motion.button
               type="button"
               className="btn-cta intro-enter"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={() => setStarted(true)}
+              onClick={() => setPhase("boot")}
             >
-              ENTER THE GAME
+              ENTER THE BATTLEFIELD
             </motion.button>
-          ) : ready ? (
-            <motion.button
-              type="button"
-              className="btn-cta intro-enter"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={enter}
-            >
-              ENTER STRIKEMAP
-            </motion.button>
-          ) : (
-            <motion.button type="button" className="btn-cta intro-enter ghost" disabled>
-              LOADING…
-            </motion.button>
-          )}
+          ) : null}
+
+          {phase !== "signal" ? (
+            <div className="intro-boot" aria-live="polite">
+              <p className="intro-boot-title">INITIALIZING BATTLEFIELD</p>
+              <ul>
+                {lines.map((l) => (
+                  <li key={l.label}>
+                    <span>{l.label}</span>
+                    <span className={l.ok ? "online" : "offline"}>{l.ok ? "ONLINE" : "OFFLINE"}</span>
+                  </li>
+                ))}
+              </ul>
+              {phase === "ready" ? (
+                <>
+                  <p className="intro-online">STRIKEMAP ONLINE</p>
+                  <button type="button" className="btn-cta intro-enter" onClick={enter}>
+                    ENTER STRIKEMAP
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn-cta intro-enter ghost" disabled>LOADING…</button>
+              )}
+            </div>
+          ) : null}
         </motion.div>
       ) : null}
     </AnimatePresence>

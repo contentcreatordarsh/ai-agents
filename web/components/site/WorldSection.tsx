@@ -8,7 +8,7 @@ export default function WorldSection() {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section id="world" className="section world-section" ref={ref}>
+    <section id="world" className="section world-section scene-panel" ref={ref}>
       <motion.div
         initial={{ opacity: 0, y: 60 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}

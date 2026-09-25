@@ -11,13 +11,15 @@ import BattlesSection from "./BattlesSection";
 import SystemsSection from "./SystemsSection";
 import TerritorySection from "./TerritorySection";
 import MultiplayerSection from "./MultiplayerSection";
+import KineticScrollSection from "./KineticScrollSection";
 import MissionSection from "./MissionSection";
 import LeaderboardSection from "./LeaderboardSection";
 import ContactSection from "./ContactSection";
 import SiteFooter from "./SiteFooter";
 import SiteModals from "./SiteModals";
+import ExperienceShell from "@/components/world/ExperienceShell";
 
-const INTRO_KEY = "strikemap_intro_seen_v2";
+const INTRO_KEY = "strikemap_intro_seen_v3";
 
 export default function ImmersiveSite() {
   const [booted, setBooted] = useState(false);
@@ -49,26 +51,29 @@ export default function ImmersiveSite() {
     <SiteUIProvider>
       {showIntro ? <IntroLoader onComplete={finishIntro} /> : null}
       {entered ? (
-      <motion.div
-        className="site-root"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <SiteNav />
-        <main>
-          <Hero />
-          <WorldSection />
-          <BattlesSection />
-          <SystemsSection />
-          <TerritorySection />
-          <MultiplayerSection />
-          <MissionSection />
-          <LeaderboardSection />
-          <ContactSection />
-        </main>
-        <SiteFooter />
-      </motion.div>
+        <ExperienceShell>
+          <motion.div
+            className="site-root experience-scroll"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <SiteNav />
+            <main>
+              <Hero />
+              <WorldSection />
+              <BattlesSection />
+              <SystemsSection />
+              <TerritorySection />
+              <MultiplayerSection />
+              <KineticScrollSection />
+              <MissionSection />
+              <LeaderboardSection />
+              <ContactSection />
+            </main>
+            <SiteFooter />
+          </motion.div>
+        </ExperienceShell>
       ) : null}
       {entered ? <SiteModals /> : null}
     </SiteUIProvider>

@@ -5,11 +5,10 @@ import { useEffect, useState } from "react";
 import { useSiteUI } from "./SiteUIContext";
 
 const LINKS = [
+  { id: "world", label: "WORLD" },
   { id: "battles", label: "BATTLES" },
-  { id: "systems", label: "GAME" },
-  { id: "world", label: "HOW IT WORKS" },
+  { id: "systems", label: "HOW IT WORKS" },
   { id: "leaderboard", label: "LEADERBOARD" },
-  { id: "contact", label: "CONTACT" },
 ];
 
 export default function SiteNav() {

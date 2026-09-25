@@ -15,7 +15,7 @@ export default function SystemsSection() {
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   return (
-    <section id="systems" className="section systems-section" ref={ref}>
+    <section id="systems" className="section systems-section scene-panel" ref={ref}>
       <motion.h2
         className="section-title"
         initial={{ opacity: 0, y: 40 }}
