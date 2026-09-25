@@ -34,7 +34,10 @@ export function useGameSocket(opts: {
         );
         protocols.push(token);
       }
-      const ws = new WebSocket(`${proto}://${location.host}/ws/games/${opts.gameId}`, protocols);
+      const ws = new WebSocket(
+        `${proto}://${location.host}/ws/v1/games/${opts.gameId}`,
+        protocols,
+      );
       wsRef.current = ws;
       ws.onopen = () => {
         retryRef.current = 0;

@@ -51,6 +51,7 @@ export function buildContractSnapshot(args: {
   territories: InternalTerritory[];
   players: Player[];
   objectives: Objective[];
+  verticalSlice?: boolean;
 }): GameStatePayload {
   const teams = buildTeamsFromScores(args.scores, args.playerCounts, args.territoryCounts);
   const baseGame: Game = args.dbGame

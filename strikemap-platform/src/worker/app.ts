@@ -34,10 +34,10 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/api/health", (c) =>
-  apiOk(c, { service: "strikemap-platform", edge: true }),
+  apiOk(c, { service: "strikemap-gateway", edge: true }),
 );
 
-app.get("/api/v1/health", (c) => apiOk(c, { service: "strikemap-platform", version: "v1" }));
+app.get("/api/v1/health", (c) => apiOk(c, { service: "strikemap-gateway", version: "v1" }));
 
 app.route("/api/v1/auth", v1AuthRoutes);
 app.route("/api/v1/games", v1GameRoutes);
@@ -92,8 +92,12 @@ async function upgradeToGame(
   return stub.fetch(new Request(c.req.raw.url, { headers, method: c.req.raw.method }));
 }
 
-/** Contract realtime: wss://strikemap.space/ws/games/{gameId} */
-app.get("/ws/games/:gameId", async (c) => {
+async function wsGameHandler(c: {
+  req: { header: (n: string) => string | undefined; raw: Request };
+  param: (n: string) => string;
+  env: Env;
+  json: (body: unknown, status?: number) => Response;
+}) {
   if (c.req.header("Upgrade") !== "websocket") {
     return c.json({ ok: false, error: { code: "INVALID_EVENT", message: "Expected websocket" } }, 426);
   }
@@ -116,7 +120,13 @@ app.get("/ws/games/:gameId", async (c) => {
   const ticket = await consumeRealtimeToken(c.env.KV, token);
   if (!ticket) return new Response("invalid token", { status: 401 });
   return upgradeToGame(c, ticket);
-});
+}
+
+/** Canonical: wss://strikemap.space/ws/v1/games/{gameId} */
+app.get("/ws/v1/games/:gameId", (c) => wsGameHandler(c));
+
+/** Legacy alias */
+app.get("/ws/games/:gameId", (c) => wsGameHandler(c));
 
 /** Legacy WS paths */
 app.get("/game/demo/ws", async (c) => {

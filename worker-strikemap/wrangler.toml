@@ -1,20 +1,49 @@
 name = "strikemap-gateway"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
 account_id = "0fa4850c978886b80a15821863df3855"
 
-# Legacy Next map UI (PR #1) on map.strikemap.space — apex is strikemap-platform.
+workers_dev = false
+
+[vars]
+ORIGIN_HOST = "54.251.237.209"
+ENVIRONMENT = "production"
+PUBLIC_APP_URL = "https://strikemap.space"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
 
 [[kv_namespaces]]
 binding = "VOTES"
 id = "1e8337d01b2f4e9b93f22ec6938c8f3d"
 
-[vars]
-ORIGIN_HOST = "54.251.237.209"
+[[kv_namespaces]]
+binding = "KV"
+id = "8e95bff391804f2e8cfb79caa164a3fc"
 
-[assets]
-directory = "./public"
-binding = "ASSETS"
+[[d1_databases]]
+binding = "DB"
+database_name = "strikemap-db"
+database_id = "d5b3d6c9-ef06-4a41-87b3-d87aa1d3f05c"
+migrations_dir = "../strikemap-platform/src/db/migrations"
 
-[[custom_domains]]
-domain = "map.strikemap.space"
+[[r2_buckets]]
+binding = "ASSETS_BUCKET"
+bucket_name = "strikemap-assets"
+
+[durable_objects]
+bindings = [{ name = "STRIKE_GAME", class_name = "StrikeGameDO" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StrikeGameDO"]
+
+[[queues.producers]]
+binding = "GAME_EVENTS"
+queue = "strikemap-game-events"
+
+[ai]
+binding = "AI"

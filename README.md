@@ -4,21 +4,22 @@
 
 | Component | Path | Description |
 |-----------|------|-------------|
-| **Game platform (primary)** | [`strikemap-platform/`](strikemap-platform/) | Cloudflare Workers, D1, Durable Objects, WebSockets, v1 API — **City Battle** MVP |
-| Map UI (Next.js) | [`web/`](web/) | Static map / demo feed (edge + EC2 export) |
-| SE assignment / origin | [`origin/`](origin/), [`worker-strikemap/`](worker-strikemap/) | EC2 Flask origin, gateway Worker, tunnel, `/secure` |
+| **Canonical Worker** | [`worker-strikemap/`](worker-strikemap/) | `strikemap-gateway` — `/api/v1`, `/ws/v1`, D1, Durable Objects, static `web/` export |
+| Game engine (bundled) | [`strikemap-platform/`](strikemap-platform/) | `StrikeGameDO`, contracts, migrations (imported by worker-strikemap) |
+| Frontend | [`web/`](web/) | Next.js — City Battle UI + [`/intel/`](web/app/intel/) security map (MapView) |
+| SE assignment / origin | [`origin/`](origin/), [`worker/`](worker/) | EC2 Flask origin, `/secure` Worker, tunnel |
 
 **Live:** https://strikemap.space (game) · https://map.strikemap.space (intel map) · https://tunnel.strikemap.space/secure
 
-### Run the game platform locally
+### Run City Battle locally
 
 ```bash
-cd strikemap-platform
-npm install
-npm run db:migrate:local
-npm run dev
-# http://localhost:8787 — landing, /demo, /api/v1/*
+cd strikemap-platform && npm install && npm run db:migrate:local
+cd ../worker-strikemap && npm install && npx wrangler dev
+cd ../web && npm install && npm run dev
 ```
+
+See [docs/CITY_BATTLE.md](docs/CITY_BATTLE.md).
 
 **Push target repo:** https://github.com/contentcreatordarsh/strikemap — see [docs/PUSH_TO_STRIKEMAP.md](docs/PUSH_TO_STRIKEMAP.md) (agent needs repo write access).
 

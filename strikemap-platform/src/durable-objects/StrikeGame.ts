@@ -1,7 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "../env";
 import { validateMovement, type MovementState } from "../lib/anticheat";
-import { generateHexTerritories } from "../lib/hex";
+import { createSector01, emptySliceScores, type SliceTeamColor } from "../lib/slice";
+import { buildSliceTeams } from "../lib/slice-teams";
 import { haversineM, obscurePosition, pointInPolygon } from "../lib/geo";
 import {
   ALL_TEAM_COLORS,
@@ -39,6 +40,8 @@ type GameConfig = {
   radiusM: number;
   durationSec: number;
   demo: boolean;
+  /** Smallest vertical slice: 1 territory, RED/BLUE, 5 min timer */
+  verticalSlice?: boolean;
 };
 
 const BROADCAST_RADIUS_M = 1000;
@@ -49,6 +52,7 @@ export class StrikeGameDO extends DurableObject<Env> {
   private endsAt = 0;
   private startedAt = 0;
   private scores: Record<TeamColor, number> = emptyScores();
+  private sliceScores: Record<SliceTeamColor, number> = emptySliceScores();
   private territories: Map<string, InternalTerritory> = new Map();
   private players: Map<string, PlayerConn> = new Map();
   private objectives: Objective[] = [];
@@ -126,43 +130,70 @@ export class StrikeGameDO extends DurableObject<Env> {
     }
     const playerCounts = emptyScores();
     for (const p of this.players.values()) playerCounts[p.team]++;
-    const players: Player[] = [...this.players.values()].map((p) => ({
-      id: p.id,
-      username: p.username,
-      team: p.team,
-      level: p.level,
-      xp: p.xp,
-      status: p.ws ? "ONLINE" : "OFFLINE",
-      stats: { wins: 0, gamesPlayed: 0, territoriesCaptured: 0, currentStreak: 0 },
-    }));
-    return buildContractSnapshot({
+    const slice = this.config?.verticalSlice ?? false;
+    const scores = slice ? { ...emptyScores(), ...this.sliceScores } : this.scores;
+    const players: Player[] = [...this.players.values()].map((p) => {
+      const obscured = obscurePosition(p.rawLat, p.rawLng, 25);
+      return {
+        id: p.id,
+        username: p.username,
+        team: p.team,
+        level: slice ? 1 : p.level,
+        xp: slice ? 0 : p.xp,
+        status: p.ws ? "ONLINE" : "OFFLINE",
+        location:
+          this.status === "ACTIVE"
+            ? {
+                lat: obscured.lat,
+                lng: obscured.lng,
+                updatedAt: new Date().toISOString(),
+              }
+            : undefined,
+        stats: { wins: 0, gamesPlayed: 0, territoriesCaptured: 0, currentStreak: 0 },
+      };
+    });
+    const snap = buildContractSnapshot({
       dbGame: null,
       gameId: this.config?.gameId ?? "",
       status: this.status,
-      scores: this.scores,
+      scores,
       territoryCounts,
       playerCounts,
       territories: [...this.territories.values()],
       players,
-      objectives: this.objectives,
+      objectives: slice ? [] : this.objectives,
+      verticalSlice: slice,
     });
+    if (slice && this.config) {
+      snap.game.durationSeconds = this.config.durationSec;
+      snap.teams = buildSliceTeams(this.sliceScores, {
+        RED: playerCounts.RED ?? 0,
+        BLUE: playerCounts.BLUE ?? 0,
+      }, {
+        RED: territoryCounts.RED ?? 0,
+        BLUE: territoryCounts.BLUE ?? 0,
+      });
+    }
+    return snap;
   }
 
   private async initGame(cfg: GameConfig) {
     this.config = cfg;
+    const slice = cfg.verticalSlice ?? !cfg.demo;
+    cfg.verticalSlice = slice;
     this.status = cfg.demo ? "ACTIVE" : "LOBBY";
     this.endsAt = Date.now() + cfg.durationSec * 1000;
     this.startedAt = cfg.demo ? Date.now() : 0;
-    this.scores = { RED: 2840, BLUE: 3120, PURPLE: 1920, GREEN: 2410 };
-    if (!cfg.demo) this.scores = emptyScores();
+    this.scores = emptyScores();
+    this.sliceScores = emptySliceScores();
+    this.objectives = [];
     this.territories.clear();
-    const hexSize = Math.max(80, Math.min(200, cfg.radiusM / 8));
-    const hexes = generateHexTerritories(cfg.centerLat, cfg.centerLng, cfg.radiusM, hexSize);
-    for (const h of hexes) {
-      this.territories.set(h.id, {
-        id: h.id,
-        center: h.center,
-        polygon: h.polygon,
+    if (slice) {
+      const sector = createSector01(cfg.centerLat, cfg.centerLng);
+      this.territories.set(sector.id, {
+        id: sector.id,
+        center: sector.center,
+        polygon: sector.polygon,
         ownerTeam: null,
         captureProgress: 0,
         capturingTeam: null,
@@ -171,25 +202,27 @@ export class StrikeGameDO extends DurableObject<Env> {
       });
     }
     if (cfg.demo) {
-      this.seedDemoPlayers();
+      this.seedDemoPlayers(slice);
       this.startTick();
-      this.startDemoSimulation();
+      if (!slice) this.startDemoSimulation();
     }
   }
 
-  private seedDemoPlayers() {
+  private seedDemoPlayers(slice: boolean) {
     if (!this.config) return;
-    const names = ["DEMO_Alpha", "DEMO_Bravo", "DEMO_Charlie", "DEMO_Delta", "DEMO_Echo", "DEMO_Foxtrot"];
+    const names = slice
+      ? ["SIM_PlayerA", "SIM_PlayerB"]
+      : ["DEMO_Alpha", "DEMO_Bravo", "DEMO_Charlie", "DEMO_Delta", "DEMO_Echo", "DEMO_Foxtrot"];
     let i = 0;
     for (const name of names) {
-      const team = ALL_TEAM_COLORS[i % ALL_TEAM_COLORS.length];
+      const team = slice
+        ? (i === 0 ? "RED" : "BLUE")
+        : ALL_TEAM_COLORS[i % ALL_TEAM_COLORS.length];
       const id = `demo_${i}`;
-      const offset = (i - 2) * 120;
-      const lat = this.config.centerLat + offset / 111_320;
-      const lng = this.config.centerLng;
+      const offset = (i === 0 ? -80 : 80) / 111_320;
+      const lat = this.config.centerLat + offset;
+      const lng = this.config.centerLng + (i === 0 ? -0.0004 : 0.0004);
       this.ensurePlayer(id, name, team, true, lat, lng);
-      const p = this.players.get(id)!;
-      p.xp = 800 + i * 120;
       i++;
     }
   }
@@ -265,9 +298,8 @@ export class StrikeGameDO extends DurableObject<Env> {
           const ok = this.applyMove(conn, payload);
           if (!ok) this.sendError(conn, "MOVEMENT_TOO_FAST", "Location update rejected");
           break;
-        case "CLAIM_OBJECTIVE":
-        case "CLAIM_SUPPLY_DROP":
-          this.handleClaim(conn, msg);
+        case "DISCONNECT":
+          conn.ws?.close();
           break;
         default:
           this.sendError(conn, "INVALID_EVENT", "Unknown event type");
@@ -330,12 +362,18 @@ export class StrikeGameDO extends DurableObject<Env> {
   private broadcastPlayerMoved(conn: PlayerConn, lat: number, lng: number) {
     const msg = this.makeMessage("PLAYER_MOVED", {
       playerId: conn.id,
+      username: conn.username,
       location: { lat, lng },
       team: conn.team,
       updatedAt: new Date().toISOString(),
     });
+    const slice = this.config?.verticalSlice ?? false;
     for (const p of this.players.values()) {
       if (!p.ws || p.ws.readyState !== WebSocket.OPEN) continue;
+      if (slice) {
+        this.sendTo(p, msg);
+        continue;
+      }
       if (p.id === conn.id) {
         this.sendTo(p, msg);
         continue;
@@ -390,28 +428,37 @@ export class StrikeGameDO extends DurableObject<Env> {
         }
       }
       const contested = teamsPresent.size > 1;
+      const slice = this.config?.verticalSlice ?? false;
       if (contested) {
-        this.emit("TERRITORY_CONTESTED", {
-          territoryId: t.id,
-          teams: [...teamsPresent.keys()],
-          captureProgress: t.captureProgress,
-        });
+        t.capturingTeam = null;
+        if (slice) {
+          this.emit("TERRITORY_UPDATED", {
+            territory: {
+              id: t.id,
+              ownerTeam: t.ownerTeam,
+              status: "CONTESTED",
+              captureProgress: t.captureProgress,
+              health: t.health,
+              playersPresent: t.playersInside.size,
+            },
+          });
+        }
+        continue;
       }
-      if (!dominant || contested) {
+      if (!dominant) {
         t.capturingTeam = null;
         continue;
       }
       if (t.ownerTeam === dominant) continue;
-      if (t.captureProgress === 0) {
-        this.emit("TERRITORY_CAPTURE_STARTED", { territoryId: t.id, team: dominant, captureProgress: 0 });
-      }
       t.capturingTeam = dominant;
-      t.captureProgress = Math.min(100, t.captureProgress + 4 + max * 2);
+      const gain = slice ? 10 * max : 4 + max * 2;
+      t.captureProgress = Math.min(100, t.captureProgress + gain);
+      const status = t.captureProgress > 0 && t.captureProgress < 100 ? "CONTESTED" : "NEUTRAL";
       this.emit("TERRITORY_UPDATED", {
         territory: {
           id: t.id,
           ownerTeam: t.ownerTeam,
-          status: "CONTESTED",
+          status: t.ownerTeam ? "CONTROLLED" : status,
           captureProgress: t.captureProgress,
           health: t.health,
           playersPresent: t.playersInside.size,
@@ -420,28 +467,26 @@ export class StrikeGameDO extends DurableObject<Env> {
       if (t.captureProgress >= 100) {
         const previousOwner = t.ownerTeam;
         t.ownerTeam = dominant;
-        t.captureProgress = 0;
+        t.captureProgress = 100;
         t.capturingTeam = null;
         t.health = 100;
-        this.scores[dominant] += 250;
-        const capturedBy = [...t.playersInside].filter((id) => this.players.get(id)?.team === dominant);
-        for (const pid of capturedBy) {
-          const p = this.players.get(pid);
-          if (p) p.xp += 250;
+        if (slice && (dominant === "RED" || dominant === "BLUE")) {
+          this.sliceScores[dominant] += 250;
         }
+        this.scores[dominant] += 250;
         this.emit("TERRITORY_CAPTURED", {
           territoryId: t.id,
           previousOwner,
           newOwner: dominant,
-          capturedBy,
-          xpAwarded: 250,
           scoreAwarded: 250,
         });
-        this.emit("SCORE_UPDATED", { scores: this.scores });
+        const scorePayload = slice
+          ? { scores: { ...this.sliceScores } }
+          : { scores: this.scores };
+        this.emit("SCORE_UPDATED", scorePayload);
         void this.persistTerritoryEvent(t.id, dominant);
       }
     }
-    this.broadcast(this.makeMessage("GAME_STATE", this.contractSnapshot()));
   }
 
   private async persistTerritoryEvent(territoryId: string, team: TeamColor) {
@@ -492,10 +537,13 @@ export class StrikeGameDO extends DurableObject<Env> {
 
   private async startGame() {
     if (!this.config) return;
+    if (this.status === "FINISHED") return;
     this.status = "COUNTDOWN";
-    for (let n = 10; n >= 1; n -= n > 3 ? 1 : 1) {
-      if (n <= 3) this.emit("GAME_COUNTDOWN", { secondsRemaining: n });
-      await new Promise((r) => setTimeout(r, n > 3 ? 700 : 800));
+    const slice = this.config.verticalSlice ?? false;
+    const start = slice ? 3 : 10;
+    for (let n = start; n >= 1; n--) {
+      if (slice || n <= 3) this.emit("GAME_COUNTDOWN", { secondsRemaining: n });
+      await new Promise((r) => setTimeout(r, slice ? 1000 : n > 3 ? 700 : 800));
     }
     this.status = "ACTIVE";
     this.startedAt = Date.now();
@@ -514,10 +562,14 @@ export class StrikeGameDO extends DurableObject<Env> {
     if (this.demoTimer) clearInterval(this.demoTimer);
     this.tickTimer = null;
     this.demoTimer = null;
-    const winning = ALL_TEAM_COLORS.reduce((a, b) => (this.scores[a] >= this.scores[b] ? a : b));
+    const slice = this.config?.verticalSlice ?? false;
+    const winning = slice
+      ? (this.sliceScores.RED >= this.sliceScores.BLUE ? "RED" : "BLUE")
+      : ALL_TEAM_COLORS.reduce((a, b) => (this.scores[a] >= this.scores[b] ? a : b));
+    const finalScores = slice ? { ...this.sliceScores } : this.scores;
     this.emit("GAME_FINISHED", {
       winnerTeam: winning,
-      finalScores: this.scores,
+      finalScores,
       stats: {
         territoriesCaptured: [...this.territories.values()].filter((t) => t.ownerTeam).length,
         objectivesCompleted: this.objectives.filter((o) => o.status === "COMPLETED").length,

@@ -40,14 +40,7 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StrikeGameDO"] }],
   "queues": {
-    "producers": [{ "binding": "GAME_EVENTS", "queue": "strikemap-game-events" }],
-    "consumers": [
-      {
-        "queue": "strikemap-game-events",
-        "max_batch_size": 10,
-        "max_batch_timeout": 5
-      }
-    ]
+    "producers": [{ "binding": "GAME_EVENTS", "queue": "strikemap-game-events" }]
   },
   "ai": {
     "binding": "AI"

@@ -10,4 +10,4 @@ echo "Copied Next static export to worker-strikemap/public/"
 cd "$ROOT/worker-strikemap"
 npm install
 npx wrangler deploy
-echo "Deployed strikemap-gateway. Add routes strikemap.space/* in dashboard if needed."
+echo "Deployed strikemap-gateway (canonical City Battle + intel map assets)."

@@ -1,17 +1,18 @@
 import { Hono } from "hono";
 import type { Env } from "../../../env";
+// Env used by listGamePlayers
 import { apiErr, apiOk } from "../../lib/api-response";
 import { joinCode, newId } from "../../../lib/ids";
 import { requireUserV1 } from "./auth";
 import type { CreateGameRequest, JoinGameRequest } from "../../../shared/contracts/api";
 import {
-  ALL_TEAM_COLORS,
   gameStatusFromDb,
   gameStatusToDb,
   teamColorFromDb,
   teamColorToDb,
   type TeamColor,
 } from "../../../shared/contracts/game";
+import { pickSliceTeam, SLICE_TEAM_COLORS } from "../../../lib/slice";
 import { issueRealtimeToken } from "../../../lib/realtime-token";
 import { buildTeamsFromScores, emptyScores, mapDbGame } from "../../lib/game-mapper";
 
@@ -37,29 +38,51 @@ v1GameRoutes.post("/demo/init", async (c) => {
         centerLat: 1.3521,
         centerLng: 103.8198,
         radiusM: 5000,
-        durationSec: 3600,
+        durationSec: 300,
         demo: true,
+        verticalSlice: true,
       }),
     }),
   );
   return apiOk(c, { gameId: demoId, demo: true });
 });
 
+async function listGamePlayers(env: Env, gameId: string) {
+  const rows = await env.DB.prepare(
+    `SELECT u.id, u.username, gp.team FROM game_players gp
+     JOIN users u ON u.id = gp.user_id WHERE gp.game_id = ? ORDER BY gp.joined_at`,
+  )
+    .bind(gameId)
+    .all<{ id: string; username: string; team: string }>();
+  return (rows.results ?? []).map((r) => ({
+    id: r.id,
+    username: r.username,
+    team: teamColorFromDb(r.team),
+    status: "ONLINE" as const,
+  }));
+}
+
 v1GameRoutes.post("/", async (c) => {
   const user = await requireUserV1(c);
   if (!user) return apiErr(c, "UNAUTHORIZED", "Authentication required", 401);
-  const body = await c.req.json<CreateGameRequest>();
+  const raw = await c.req.json<Partial<CreateGameRequest>>();
+  const body: CreateGameRequest = {
+    name: raw.name ?? "Singapore Battle",
+    mode: "CITY_BATTLE",
+    center: raw.center ?? { lat: 1.3521, lng: 103.8198 },
+    radiusM: raw.radiusM ?? 400,
+    durationSeconds: raw.durationSeconds ?? 300,
+    teamCount: 2,
+    maxPlayers: raw.maxPlayers ?? 8,
+  };
   if (body.radiusM < 100 || body.radiusM > 50_000) {
     return apiErr(c, "VALIDATION_ERROR", "radiusM must be 100–50000", 400);
   }
-  if (body.durationSeconds < 900 || body.durationSeconds > 86_400) {
-    return apiErr(c, "VALIDATION_ERROR", "durationSeconds must be 900–86400", 400);
+  if (body.durationSeconds < 300 || body.durationSeconds > 86_400) {
+    return apiErr(c, "VALIDATION_ERROR", "durationSeconds must be 300–86400", 400);
   }
-  if (body.teamCount < 2 || body.teamCount > 4) {
-    return apiErr(c, "VALIDATION_ERROR", "teamCount must be 2–4", 400);
-  }
-  if (body.maxPlayers < 2 || body.maxPlayers > 200) {
-    return apiErr(c, "VALIDATION_ERROR", "maxPlayers must be 2–200", 400);
+  if (body.maxPlayers < 2 || body.maxPlayers > 8) {
+    return apiErr(c, "VALIDATION_ERROR", "maxPlayers must be 2–8", 400);
   }
   const gameId = newId("game");
   const code = joinCode();
@@ -94,12 +117,35 @@ v1GameRoutes.post("/", async (c) => {
         radiusM: body.radiusM,
         durationSec: body.durationSeconds,
         demo: false,
+        verticalSlice: true,
       }),
     }),
   );
 
+  await c.env.DB.prepare(
+    "INSERT INTO game_players (game_id, user_id, team, joined_at) VALUES (?, ?, ?, ?)",
+  )
+    .bind(gameId, user.id, teamColorToDb("RED"), now)
+    .run();
+  await gameStub(c.env, gameId).fetch(
+    new Request("http://do/player-join", {
+      method: "POST",
+      body: JSON.stringify({ playerId: user.id, username: user.username, team: "RED" }),
+    }),
+  );
+
+  const joinUrl = `https://strikemap.space/join/${code}`;
   return apiOk(c, {
-    game: { id: gameId, code, status: "LOBBY" as const },
+    game: {
+      id: gameId,
+      code,
+      status: "LOBBY" as const,
+      name: body.name,
+      joinUrl,
+      creatorId: user.id,
+      maxPlayers: body.maxPlayers,
+      durationSeconds: body.durationSeconds,
+    },
   });
 });
 
@@ -120,7 +166,8 @@ v1GameRoutes.get("/:gameId", async (c) => {
   const total = await c.env.DB.prepare("SELECT COUNT(*) as c FROM game_players WHERE game_id = ?")
     .bind(row.id)
     .first<{ c: number }>();
-  return apiOk(c, { game, teams, playerCount: total?.c ?? 0 });
+  const players = await listGamePlayers(c.env, row.id as string);
+  return apiOk(c, { game, teams, playerCount: total?.c ?? 0, players });
 });
 
 v1GameRoutes.post("/:gameId/join", async (c) => {
@@ -150,17 +197,21 @@ v1GameRoutes.post("/:gameId/join", async (c) => {
     return apiErr(c, "GAME_FULL", "Game is full", 409);
   }
   let team: TeamColor = body.team ?? "BLUE";
-  if (!body.team) {
+  if (!body.team || !SLICE_TEAM_COLORS.includes(body.team as never)) {
     const teams = await c.env.DB.prepare(
       `SELECT team, COUNT(*) as c FROM game_players WHERE game_id = ? GROUP BY team`,
     )
       .bind(row.id)
       .all<{ team: string; c: number }>();
-    const tally = new Map<TeamColor, number>();
-    for (const t of ALL_TEAM_COLORS) tally.set(t, 0);
-    for (const t of teams.results ?? []) tally.set(teamColorFromDb(t.team), t.c);
-    team = ALL_TEAM_COLORS.reduce((a, b) => ((tally.get(a) ?? 0) <= (tally.get(b) ?? 0) ? a : b));
+    let red = 0;
+    let blue = 0;
+    for (const t of teams.results ?? []) {
+      if (t.team === "red") red = t.c;
+      if (t.team === "blue") blue = t.c;
+    }
+    team = pickSliceTeam({ red, blue });
   }
+  if (!SLICE_TEAM_COLORS.includes(team as never)) team = "BLUE";
   const now = Date.now();
   await c.env.DB.prepare(
     "INSERT INTO game_players (game_id, user_id, team, joined_at) VALUES (?, ?, ?, ?)",
@@ -175,6 +226,7 @@ v1GameRoutes.post("/:gameId/join", async (c) => {
   );
   return apiOk(c, {
     player: { id: user.id, team },
+    message: `YOU JOINED ${team}`,
     game: { id: row.id, status: gameStatusFromDb(row.status as string) },
   });
 });
@@ -202,11 +254,14 @@ v1GameRoutes.post("/:gameId/start", async (c) => {
   const row = await loadGame(c.env, c.req.param("gameId"));
   if (!row) return apiErr(c, "GAME_NOT_FOUND", "Game does not exist", 404);
   if (row.host_user_id !== user.id) return apiErr(c, "FORBIDDEN", "Only creator can start", 403);
+  if (gameStatusFromDb(row.status as string) !== "LOBBY") {
+    return apiErr(c, "GAME_NOT_ACTIVE", "Game already started or finished", 400);
+  }
   await c.env.DB.prepare("UPDATE games SET status = ? WHERE id = ?")
     .bind(gameStatusToDb("COUNTDOWN"), row.id)
     .run();
   await gameStub(c.env, row.id as string).fetch(new Request("http://do/start", { method: "POST" }));
-  return apiOk(c, { status: "COUNTDOWN" as const, countdownSeconds: 10 });
+  return apiOk(c, { status: "COUNTDOWN" as const, countdownSeconds: 3 });
 });
 
 v1GameRoutes.post("/:gameId/end", async (c) => {
