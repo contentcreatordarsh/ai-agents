@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST="${STRIKEMAP_EC2_HOST:-54.251.237.209}"
+KEY="${STRIKEMAP_EC2_KEY:-$HOME/.ssh/strikemap-ec2-key.pem}"
+REMOTE_DIR="/opt/strikemap/origin"
+
+echo "Deploying origin to ubuntu@${HOST}..."
+
+tar -C /workspace/origin -czf /tmp/strikemap-origin.tgz .
+scp -o StrictHostKeyChecking=no -i "${KEY}" /tmp/strikemap-origin.tgz "ubuntu@${HOST}:/tmp/"
+ssh -o StrictHostKeyChecking=no -i "${KEY}" "ubuntu@${HOST}" \
+  "mkdir -p ${REMOTE_DIR} && tar -xzf /tmp/strikemap-origin.tgz -C ${REMOTE_DIR}"
+
+ssh -o StrictHostKeyChecking=no -i "${KEY}" "ubuntu@${HOST}" bash -s <<'REMOTE'
+set -euo pipefail
+cd /opt/strikemap
+if [ ! -d venv ]; then python3 -m venv venv; fi
+./venv/bin/pip install -q -r origin/requirements.txt
+sudo systemctl restart strikemap-origin.service
+sudo systemctl is-active strikemap-origin.service
+REMOTE
+
+echo "Deploy complete."

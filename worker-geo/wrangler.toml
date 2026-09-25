@@ -1,0 +1,8 @@
+name = "strikemap-geo-edge"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+account_id = "0fa4850c978886b80a15821863df3855"
+
+[[routes]]
+pattern = "strikemap.space/api/geo"
+zone_name = "strikemap.space"

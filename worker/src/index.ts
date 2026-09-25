@@ -72,13 +72,26 @@ function secureHtmlPage(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Secure access</title>
+  <title>StrikeMap Live Ops</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+    :root { --bg:#0b0f14; --panel:#121a24; --border:#243044; --accent:#ff4655; --text:#e8eef7; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; }
+    main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1rem; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem 1.5rem; }
+    h1 { margin: 0 0 0.5rem; font-size: 1.1rem; letter-spacing: 0.06em; }
+    p { line-height: 1.55; margin: 0; }
+    a { color: #9ec5ff; }
+    .badge { display:inline-block; margin-top:1rem; font-size:.75rem; color:#8fa3bf; }
   </style>
 </head>
 <body>
-  <p>${escapeHtml(email)} authenticated at ${escapeHtml(timestamp)} from ${countryLink}</p>
+  <main>
+    <div class="card">
+      <h1>STRIKEMAP LIVE OPS</h1>
+      <p>${escapeHtml(email)} authenticated at ${escapeHtml(timestamp)} from ${countryLink}</p>
+      <span class="badge">Zero Trust · Worker · private R2 flags</span>
+    </div>
+  </main>
 </body>
 </html>`;
 }

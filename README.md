@@ -1,39 +1,40 @@
-# Cloudflare Solutions Engineer — Stand & Deliver
+# StrikeMap — Tactical Atlas + Live Ops
 
-Implementation repo for the Cloudflare SE technical assignment: origin header echo, Cloudflare proxy/TLS, rate limiting, Tunnel, Zero Trust Access, and a Worker with private R2 flag assets.
+Cloudflare SE assignment implementation on **strikemap.space**: tactical map trainer on **AWS EC2**, edge **Workers**, **Tunnel**, **Zero Trust** `/secure`, and private **R2** flags.
+
+**Live:** https://strikemap.space · https://tunnel.strikemap.space · https://strikemap.space/debug/headers
 
 ## Quick start (local)
 
 ```bash
 cd origin
-python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
-curl -H "X-Test: 1" http://127.0.0.1:8080/
+open http://127.0.0.1:8080
 ```
 
-## Full deployment
-
-See **[docs/SETUP.md](docs/SETUP.md)** for step-by-step dashboard and infrastructure instructions.
-
-## Components
-
-| Path | Purpose |
-|------|---------|
-| `origin/` | Flask app — returns all request headers in the response body |
-| `worker/` | Wrangler Worker — `/secure` HTML + `/secure/{CC}` flags from R2 |
-| `cloudflared/` | Example tunnel ingress config |
-| `scripts/` | Optional origin firewall helper (Cloudflare IP allowlist) |
-| `docs/PRESENTATION_OUTLINE.md` | Slide deck outline for the panel |
-
-## Worker
+## Deploy origin to EC2
 
 ```bash
-cd worker
-npm install
-# Edit wrangler.toml (account_id, PUBLIC_HOST)
-npx wrangler deploy
+./infra/deploy-origin-ec2.sh
 ```
+
+## Workers
+
+```bash
+cd worker && npm install && npx wrangler deploy      # Live Ops /secure + R2
+cd worker-geo && npm install && npx wrangler deploy # /api/geo edge
+```
+
+See **[docs/CLOUDFLARE_ROUTES_MANUAL.md](docs/CLOUDFLARE_ROUTES_MANUAL.md)** if routes fail via API.
+
+## Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/STRIKEMAP_DEMO.md](docs/STRIKEMAP_DEMO.md) | Panel demo script |
+| [docs/SETUP.md](docs/SETUP.md) | Full assignment checklist |
+| [docs/STRIKEMAP_STATUS.md](docs/STRIKEMAP_STATUS.md) | Infra status |
 
 ## What you must do outside this repo
 

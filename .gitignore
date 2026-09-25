@@ -5,3 +5,4 @@ worker/.wrangler/
 worker/.tmp-flags/
 *.pyc
 .DS_Store
+worker-geo/node_modules/
