@@ -11,6 +11,9 @@ worker-strikemap/public/index.txt
 web/node_modules/
 web/out/
 web/.next/
+strikemap-platform/node_modules/
+strikemap-platform/dist/
+strikemap-platform/.wrangler/
 strikemap-live/
 origin/data/votes.json
 origin/web_export/

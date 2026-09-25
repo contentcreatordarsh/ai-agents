@@ -1,0 +1,34 @@
+{
+  "name": "strikemap-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:client && wrangler dev",
+    "dev:client": "vite --config client/vite.config.ts",
+    "build": "npm run build:client && wrangler deploy --dry-run",
+    "build:client": "vite build --config client/vite.config.ts",
+    "deploy": "npm run build:client && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply strikemap-db --local && wrangler d1 migrations apply strikemap-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply strikemap-db --local",
+    "db:seed": "wrangler d1 execute strikemap-db --local --file=./src/db/seed.sql",
+    "types": "wrangler types",
+    "check": "wrangler check"
+  },
+  "dependencies": {
+    "hono": "^4.9.0",
+    "maplibre-gl": "^5.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260923.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.3.0",
+    "wrangler": "^4.140.0"
+  }
+}

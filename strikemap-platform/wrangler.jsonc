@@ -1,0 +1,60 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "strikemap-platform",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "0fa4850c978886b80a15821863df3855",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "PUBLIC_APP_URL": "https://strikemap.space"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "strikemap-db",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "src/db/migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "8e95bff391804f2e8cfb79caa164a3fc"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSETS_BUCKET",
+      "bucket_name": "strikemap-assets"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "STRIKE_GAME", "class_name": "StrikeGameDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StrikeGameDO"] }],
+  "queues": {
+    "producers": [{ "binding": "GAME_EVENTS", "queue": "strikemap-game-events" }],
+    "consumers": [
+      {
+        "queue": "strikemap-game-events",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      }
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "routes": [
+    { "pattern": "strikemap.space/*", "zone_name": "strikemap.space" },
+    { "pattern": "www.strikemap.space/*", "zone_name": "strikemap.space" },
+    { "pattern": "api.strikemap.space/*", "zone_name": "strikemap.space" }
+  ]
+}
