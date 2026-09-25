@@ -6,7 +6,8 @@ Wrangler uploaded the scripts but API route attachment failed (`No access to the
 
 | Worker | Route |
 |--------|--------|
+| **`strikemap-gateway`** | **`strikemap.space/*`** and **`www.strikemap.space/*`** |
 | `se-stand-deliver-secure` | `tunnel.strikemap.space/secure*` |
-| `strikemap-geo-edge` | `strikemap.space/api/geo` |
+| `strikemap-geo-edge` | *(optional; merged into gateway)* `strikemap.space/api/geo` |
 
 Then redeploy is optional; routes take effect immediately.

@@ -1,6 +1,10 @@
 origin/.venv/
 origin/__pycache__/
 worker/node_modules/
+worker-geo/node_modules/
+worker-strikemap/node_modules/
+strikemap-live/
+origin/data/votes.json
 worker/.wrangler/
 worker/.tmp-flags/
 *.pyc

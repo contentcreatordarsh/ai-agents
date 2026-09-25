@@ -1,0 +1,23 @@
+name = "strikemap-gateway"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+account_id = "0fa4850c978886b80a15821863df3855"
+
+[[routes]]
+pattern = "strikemap.space/*"
+zone_name = "strikemap.space"
+
+[[routes]]
+pattern = "www.strikemap.space/*"
+zone_name = "strikemap.space"
+
+[[kv_namespaces]]
+binding = "VOTES"
+id = "1e8337d01b2f4e9b93f22ec6938c8f3d"
+
+[vars]
+ORIGIN_HOST = "54.251.237.209"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
