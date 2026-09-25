@@ -38,10 +38,18 @@ Open http://localhost:8787
 
 Route `strikemap.space/*` to this Worker (replace legacy gateway when ready).
 
+## API contracts (authoritative)
+
+- REST base: `https://strikemap.space/api/v1`
+- Envelope: `{ ok: true, data }` / `{ ok: false, error: { code, message, requestId } }`
+- Auth: `Authorization: Bearer <session token>`
+- Realtime: `wss://strikemap.space/ws/games/{gameId}` with `Sec-WebSocket-Protocol: STRIKEMAP_GAME_V1, <short-lived rt_ token>`
+- Shared types: `src/shared/contracts/*`
+
 ## Demo
 
-- **/demo** — simulated City Battle (24 DEMO players, territory ticks, supply drops)
-- Real multiplayer: signup → create battle → share `/join/{code}` → start → WebSocket `/game/{id}/ws`
+- **/demo** — simulated City Battle (DEMO players, territory ticks, supply drops)
+- Real multiplayer: signup → `POST /api/v1/games` → share `/join/{code}` → `POST .../realtime/connect` → WebSocket
 
 ## Privacy & anti-cheat
 

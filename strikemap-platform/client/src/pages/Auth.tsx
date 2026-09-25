@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, setToken } from "../lib/api";
 
 export function LoginPage() {
   const nav = useNavigate();
@@ -10,7 +10,11 @@ export function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      const data = await api<{ token: string }>("/api/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      setToken(data.token);
       nav("/dashboard");
     } catch {
       setErr("Invalid credentials");
@@ -38,10 +42,11 @@ export function SignupPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api("/api/auth/signup", {
+      const data = await api<{ token: string }>("/api/v1/auth/signup", {
         method: "POST",
         body: JSON.stringify({ email, username, password }),
       });
+      setToken(data.token);
       nav("/dashboard");
     } catch {
       setErr("Could not create account");

@@ -16,19 +16,19 @@ export function CreateBattlePage() {
       const pos = await new Promise<GeolocationPosition>((res, rej) =>
         navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 }),
       ).catch(() => ({ coords: { latitude: 1.3521, longitude: 103.8198 } } as GeolocationPosition));
-      const data = await api<{ id: string; joinCode: string; joinUrl: string }>("/api/games", {
+      const data = await api<{ game: { id: string; code: string } }>("/api/v1/games", {
         method: "POST",
         body: JSON.stringify({
-          locationName,
-          centerLat: pos.coords.latitude,
-          centerLng: pos.coords.longitude,
-          radiusKm,
-          durationMin,
+          name: locationName,
+          mode: "CITY_BATTLE",
+          center: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          radiusM: radiusKm * 1000,
+          durationSeconds: durationMin * 60,
           teamCount: 4,
           maxPlayers,
         }),
       });
-      nav(`/game/${data.id}?host=1&code=${data.joinCode}`);
+      nav(`/game/${data.game.id}?host=1&code=${data.game.code}`);
     } catch {
       setErr("Create failed — login required?");
     }

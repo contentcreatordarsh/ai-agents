@@ -5,6 +5,7 @@ import {
   getSessionUser,
   hashPassword,
   parseSessionCookie,
+  resolveSessionToken,
   sessionCookie,
   verifyPassword,
 } from "../../lib/auth";
@@ -89,7 +90,7 @@ authRoutes.get("/me", async (c) => {
 });
 
 export async function requireUser(c: { env: Env; req: { header: (n: string) => string | undefined } }) {
-  const sid = parseSessionCookie(c.req.header("Cookie") ?? null);
+  const sid = resolveSessionToken(c.req.header("Cookie") ?? null, c.req.header("Authorization") ?? null);
   if (!sid) return null;
   return getSessionUser(c.env.DB, sid);
 }

@@ -16,7 +16,7 @@ export function GamePage({ demo = false }: { demo?: boolean }) {
 
   useEffect(() => {
     if (demo) {
-      void api("/api/games/demo/init", { method: "POST" });
+      void api("/api/v1/games/demo/init", { method: "POST", body: "{}" });
       setStarted(true);
       return;
     }
@@ -24,19 +24,18 @@ export function GamePage({ demo = false }: { demo?: boolean }) {
 
   const { snapshot, status, events } = useGameSocket({
     gameId: id,
-    team,
     demo,
     enabled: started,
   });
 
   const startBattle = async () => {
-    await api(`/api/games/${id}/start`, { method: "POST" });
+    await api(`/api/v1/games/${id}/start`, { method: "POST", body: "{}" });
     setStarted(true);
   };
 
   const playerXp = useMemo(() => {
     if (!snapshot) return 0;
-    const me = snapshot.players.find((p) => !p.demo && p.team === team);
+    const me = snapshot.players.find((p) => p.team === team);
     return me?.xp ?? snapshot.players[0]?.xp ?? 0;
   }, [snapshot, team]);
 

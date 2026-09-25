@@ -99,3 +99,13 @@ export function parseSessionCookie(cookieHeader: string | null): string | null {
   const match = cookieHeader.match(/(?:^|;\s*)sm_session=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
+
+export function parseBearerToken(authHeader: string | null): string | null {
+  if (!authHeader) return null;
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+export function resolveSessionToken(cookieHeader: string | null, authHeader: string | null): string | null {
+  return parseBearerToken(authHeader) ?? parseSessionCookie(cookieHeader);
+}

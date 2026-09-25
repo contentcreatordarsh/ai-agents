@@ -11,16 +11,16 @@ export function JoinPage() {
 
   useEffect(() => {
     if (!code) return;
-    void api<{ game: { id: string; locationName: string } }>(`/api/games/join/${code}`).then((d) =>
-      setGame(d.game),
+    void api<{ game: { id: string; name: string } }>(`/api/v1/games/join/${code}`).then((d) =>
+      setGame({ id: d.game.id, locationName: d.game.name }),
     );
   }, [code]);
 
   const join = async () => {
     if (!game) return;
-    await api(`/api/games/${game.id}/join`, {
+    await api(`/api/v1/games/${game.id}/join`, {
       method: "POST",
-      body: JSON.stringify({ team, joinCode: code?.toUpperCase() }),
+      body: JSON.stringify({ team }),
     });
     nav(`/game/${game.id}?team=${team}`);
   };

@@ -1,20 +1,30 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../env";
+import { requestIdMiddleware } from "./middleware/request-id";
+import { apiOk } from "./lib/api-response";
+import { v1GameRoutes } from "./routes/v1/games";
+import { v1AuthRoutes, requireUserV1 } from "./routes/v1/auth";
+import { consumeRealtimeToken } from "../lib/realtime-token";
+import { WS_PROTOCOL_VERSION } from "../shared/contracts/events";
 import { authRoutes } from "./routes/auth";
 import { gameRoutes } from "./routes/games";
 import { leaderboardRoutes } from "./routes/leaderboard";
-import { requireUser } from "./routes/auth";
 
-const app = new Hono<{ Bindings: Env }>();
+type Variables = { requestId: string };
+
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 app.use(
   "*",
   cors({
     origin: (origin) => origin ?? "*",
     credentials: true,
+    exposeHeaders: ["X-Request-ID"],
   }),
 );
+
+app.use("*", requestIdMiddleware);
 
 app.use("*", async (c, next) => {
   await next();
@@ -24,71 +34,108 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/api/health", (c) =>
-  c.json({ ok: true, service: "strikemap-platform", edge: true }),
+  apiOk(c, { service: "strikemap-platform", edge: true }),
 );
 
+app.get("/api/v1/health", (c) => apiOk(c, { service: "strikemap-platform", version: "v1" }));
+
+app.route("/api/v1/auth", v1AuthRoutes);
+app.route("/api/v1/games", v1GameRoutes);
+app.get("/api/v1/profile/me", async (c) => {
+  const user = await requireUserV1(c);
+  if (!user) {
+    return c.json(
+      {
+        ok: false,
+        error: { code: "UNAUTHORIZED", message: "Authentication required", requestId: c.get("requestId") },
+      },
+      401,
+    );
+  }
+  const stats = await c.env.DB.prepare("SELECT * FROM player_stats WHERE user_id = ?")
+    .bind(user.id)
+    .first<{ games_played: number; games_won: number; captures: number }>();
+  return apiOk(c, {
+    profile: {
+      id: user.id,
+      username: user.username,
+      level: user.level,
+      xp: user.totalXp,
+      wins: stats?.games_won ?? 0,
+      gamesPlayed: stats?.games_played ?? 0,
+      territoriesCaptured: stats?.captures ?? 0,
+      currentStreak: 0,
+      avatarUrl: null,
+    },
+  });
+});
+
+/** Legacy routes (deprecated — use /api/v1) */
 app.route("/api/auth", authRoutes);
 app.route("/api/games", gameRoutes);
 app.route("/api/leaderboard", leaderboardRoutes);
 
-app.get("/api/profile/:userId", async (c) => {
-  const userId = c.req.param("userId");
-  const profile = await c.env.DB.prepare(
-    `SELECT p.*, u.username, ps.games_played, ps.games_won, ps.captures
-     FROM profiles p JOIN users u ON u.id = p.user_id
-     LEFT JOIN player_stats ps ON ps.user_id = p.user_id
-     WHERE p.user_id = ? OR u.username = ?`,
-  )
-    .bind(userId, userId)
-    .first();
-  if (!profile) return c.json({ error: "not_found" }, 404);
-  return c.json({ profile });
-});
-
-/** Demo WebSocket without auth (must be before :gameId route) */
-app.get("/game/demo/ws", async (c) => {
-  const upgrade = c.req.header("Upgrade");
-  if (upgrade !== "websocket") return c.json({ error: "expected_websocket" }, 426);
-  const stub = c.env.STRIKE_GAME.get(c.env.STRIKE_GAME.idFromName("demo_city_battle"));
-  const url = new URL(c.req.url);
-  url.pathname = "/";
-  url.searchParams.set("playerId", `guest_${crypto.randomUUID().slice(0, 8)}`);
-  url.searchParams.set("username", "DEMO_Guest");
-  url.searchParams.set("team", "green");
-  url.searchParams.set("demo", "1");
-  url.searchParams.set("lat", "1.3521");
-  url.searchParams.set("lng", "103.8198");
-  return stub.fetch(new Request(url.toString(), { headers: c.req.raw.headers }));
-});
-
-/** WebSocket upgrade → game Durable Object */
-app.get("/game/:gameId/ws", async (c) => {
-  const user = await requireUser(c);
-  if (!user) return c.json({ error: "unauthorized" }, 401);
-  const gameId = c.req.param("gameId");
-  const team = (c.req.query("team") ?? "blue") as string;
-  const lat = c.req.query("lat") ?? "0";
-  const lng = c.req.query("lng") ?? "0";
-  const demo = c.req.query("demo") === "1" ? "1" : "0";
-  const upgrade = c.req.header("Upgrade");
-  if (upgrade !== "websocket") {
-    return c.json({ error: "expected_websocket" }, 426);
+async function upgradeToGame(
+  c: { env: Env; req: { header: (n: string) => string | undefined; raw: Request }; param: (n: string) => string },
+  ticket: { gameId: string; userId: string; username: string; team: string; demo: boolean },
+) {
+  const gameId = c.param("gameId");
+  if (ticket.gameId !== gameId && gameId !== "demo_city_battle") {
+    return new Response("forbidden", { status: 403 });
   }
   const stub = c.env.STRIKE_GAME.get(c.env.STRIKE_GAME.idFromName(gameId));
-  const url = new URL(c.req.url);
-  url.searchParams.set("playerId", user.id);
-  url.searchParams.set("username", user.username);
-  url.searchParams.set("team", team);
-  url.searchParams.set("lat", lat);
-  url.searchParams.set("lng", lng);
-  url.searchParams.set("demo", demo);
-  return stub.fetch(
-    new Request(url.toString(), { headers: c.req.raw.headers }),
-  );
+  const headers = new Headers(c.req.raw.headers);
+  headers.set("X-StrikeMap-Player-Id", ticket.userId);
+  headers.set("X-StrikeMap-Username", ticket.username);
+  headers.set("X-StrikeMap-Team", ticket.team);
+  headers.set("X-StrikeMap-Demo", ticket.demo ? "1" : "0");
+  return stub.fetch(new Request(c.req.raw.url, { headers, method: c.req.raw.method }));
+}
+
+/** Contract realtime: wss://strikemap.space/ws/games/{gameId} */
+app.get("/ws/games/:gameId", async (c) => {
+  if (c.req.header("Upgrade") !== "websocket") {
+    return c.json({ ok: false, error: { code: "INVALID_EVENT", message: "Expected websocket" } }, 426);
+  }
+  const gameId = c.param("gameId");
+  const protocols = (c.req.header("Sec-WebSocket-Protocol") ?? "").split(",").map((s) => s.trim());
+  if (!protocols.includes(WS_PROTOCOL_VERSION)) {
+    return new Response("protocol required", { status: 426 });
+  }
+  const token = protocols.find((p) => p.startsWith("rt_"));
+  if (gameId === "demo_city_battle") {
+    return upgradeToGame(c, {
+      gameId,
+      userId: `guest_${crypto.randomUUID().slice(0, 8)}`,
+      username: "DEMO_Guest",
+      team: "GREEN",
+      demo: true,
+    });
+  }
+  if (!token) return new Response("missing token", { status: 401 });
+  const ticket = await consumeRealtimeToken(c.env.KV, token);
+  if (!ticket) return new Response("invalid token", { status: 401 });
+  return upgradeToGame(c, ticket);
+});
+
+/** Legacy WS paths */
+app.get("/game/demo/ws", async (c) => {
+  if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
+  return upgradeToGame(c, {
+    gameId: "demo_city_battle",
+    userId: `guest_${crypto.randomUUID().slice(0, 8)}`,
+    username: "DEMO_Guest",
+    team: "green",
+    demo: true,
+  });
 });
 
 app.all("*", async (c) => {
-  if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/game/")) {
+  if (
+    c.req.path.startsWith("/api/") ||
+    c.req.path.startsWith("/game/") ||
+    c.req.path.startsWith("/ws/")
+  ) {
     return c.notFound();
   }
   return c.env.ASSETS.fetch(c.req.raw);
