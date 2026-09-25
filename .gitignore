@@ -1,0 +1,7 @@
+origin/.venv/
+origin/__pycache__/
+worker/node_modules/
+worker/.wrangler/
+worker/.tmp-flags/
+*.pyc
+.DS_Store

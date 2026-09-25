@@ -1,0 +1,11 @@
+# Copy to /etc/cloudflared/config.yml (or ~/.cloudflared/config.yml) on the origin host.
+# Replace tokens, hostnames, and service URLs.
+
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  # Worker handles /secure* on this hostname (route Worker in dashboard or wrangler routes).
+  - hostname: tunnel.example.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404
