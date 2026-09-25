@@ -1,14 +1,11 @@
 name = "se-stand-deliver-secure"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
+account_id = "0fa4850c978886b80a15821863df3855"
 
-# Replace with your account ID: wrangler whoami
-# account_id = ""
-
-# Route is attached after deploy; example for tunnel.example.com:
-# [[routes]]
-# pattern = "tunnel.example.com/secure*"
-# zone_name = "example.com"
+[[routes]]
+pattern = "tunnel.strikemap.space/secure*"
+zone_name = "strikemap.space"
 
 [[r2_buckets]]
 binding = "FLAGS"
@@ -17,4 +14,4 @@ preview_bucket_name = "se-country-flags-preview"
 
 [vars]
 # Public hostname used in HTML links (no trailing slash)
-PUBLIC_HOST = "tunnel.example.com"
+PUBLIC_HOST = "tunnel.strikemap.space"

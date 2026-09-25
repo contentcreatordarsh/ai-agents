@@ -10,11 +10,19 @@
 | Origin app | Flask header echo on port 80 via nginx |
 | Direct test | `curl -H "X-Test: 1" http://54.251.237.209/` |
 
-## Blocked on one Cloudflare sign-in (same as AWS login)
+## Wrangler (done)
 
-DNS, SSL mode, rate limits, Tunnel, Access, Worker, and R2 require the **Cloudflare account that owns strikemap.space** to authorize this environment once (`wrangler login`).
+- Logged in as **darshan.p.hegde@gmail.com** (account `0fa4850c978886b80a15821863df3855`).
+- Worker **`se-stand-deliver-secure`** deployed on route `tunnel.strikemap.space/secure*`.
+- R2 bucket **`se-country-flags`** created; flag objects uploaded.
+- Tunnel **`strikemap-origin`** (`f9337053-4b87-4a78-ab07-14721d10eb53`) ingress → `http://127.0.0.1:8080`; **cloudflared** running on EC2.
 
-After that, the agent can finish the rest without your laptop.
+## Blocked: DNS API (Wrangler OAuth has no Zone DNS Edit)
+
+Wrangler OAuth cannot create/edit DNS records (API returns auth error). Need **one** of:
+
+1. **API token** (recommended): Cloudflare dashboard → Profile → API Tokens → **Edit zone DNS** for `strikemap.space` only → set as `CLOUDFLARE_API_TOKEN` in this agent (tell the agent the token once), **or**
+2. **Manual DNS** (two records below) in the Cloudflare dashboard.
 
 ## DNS target (when Wrangler/API is authorized)
 
