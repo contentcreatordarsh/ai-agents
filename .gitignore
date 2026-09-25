@@ -3,8 +3,12 @@ origin/__pycache__/
 worker/node_modules/
 worker-geo/node_modules/
 worker-strikemap/node_modules/
+web/node_modules/
+web/out/
+web/.next/
 strikemap-live/
 origin/data/votes.json
+origin/web_export/
 worker/.wrangler/
 worker/.tmp-flags/
 *.pyc

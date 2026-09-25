@@ -7,7 +7,17 @@ REMOTE_DIR="/opt/strikemap/origin"
 
 echo "Deploying origin to ubuntu@${HOST}..."
 
-tar -C /workspace/origin -czf /tmp/strikemap-origin.tgz .
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -d "$ROOT/web/out" ]; then
+  rm -rf "$ROOT/origin/web_export"
+  mkdir -p "$ROOT/origin/web_export"
+  cp -a "$ROOT/web/out/." "$ROOT/origin/web_export/"
+  echo "Bundled Next.js static export into origin/web_export/"
+else
+  echo "Note: $ROOT/web/out missing — run infra/build-web-to-worker.sh or cd web && npm run build"
+fi
+
+tar -C "$ROOT/origin" -czf /tmp/strikemap-origin.tgz .
 scp -o StrictHostKeyChecking=no -i "${KEY}" /tmp/strikemap-origin.tgz "ubuntu@${HOST}:/tmp/"
 ssh -o StrictHostKeyChecking=no -i "${KEY}" "ubuntu@${HOST}" \
   "mkdir -p ${REMOTE_DIR} && tar -xzf /tmp/strikemap-origin.tgz -C ${REMOTE_DIR}"

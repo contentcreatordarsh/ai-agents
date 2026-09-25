@@ -1,0 +1,20 @@
+{
+  "maps": [
+    {
+      "id": "site-alpha",
+      "name": "Site Alpha",
+      "game": "Tactical 5v5",
+      "description": "Three-lane strike map with mid control and flank routes.",
+      "callouts": [
+        { "id": "a-site", "label": "A Site", "x": 72, "y": 28 },
+        { "id": "b-site", "label": "B Site", "x": 22, "y": 68 },
+        { "id": "mid", "label": "Mid", "x": 50, "y": 48 },
+        { "id": "heaven", "label": "Heaven", "x": 80, "y": 18 },
+        { "id": "garage", "label": "Garage", "x": 35, "y": 55 },
+        { "id": "market", "label": "Market", "x": 58, "y": 62 },
+        { "id": "tunnel", "label": "Tunnel", "x": 48, "y": 78 },
+        { "id": "spawn", "label": "Attack Spawn", "x": 8, "y": 42 }
+      ]
+    }
+  ]
+}

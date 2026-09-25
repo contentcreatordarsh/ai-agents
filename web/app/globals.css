@@ -1,0 +1,33 @@
+:root {
+  --ink: #e8e4dc;
+  --ink-muted: #8a8480;
+  --paper: #1a1916;
+  --paper-alt: #221f1b;
+  --paper-border: #302c27;
+  --signal-red: #e05252;
+  --signal-green: #4aba7a;
+  --signal-amber: #d4a020;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+a {
+  color: #9ec5ff;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

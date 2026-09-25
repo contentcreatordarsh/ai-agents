@@ -8,12 +8,13 @@ import json
 import threading
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 VOTES_FILE = DATA_DIR / "votes.json"
 MAPS_FILE = DATA_DIR / "maps.json"
+WEB_EXPORT = BASE_DIR / "web_export"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 _lock = threading.Lock()
@@ -44,9 +45,35 @@ def format_headers() -> str:
     return "\n".join(lines) + ("\n" if lines else "")
 
 
+def _web_export_ready() -> bool:
+    return (WEB_EXPORT / "index.html").is_file()
+
+
 @app.get("/")
 def home():
+    if _web_export_ready():
+        return send_from_directory(WEB_EXPORT, "index.html")
     return render_template("index.html")
+
+
+@app.get("/trainer")
+def trainer():
+    """Legacy callout-vote tactical atlas (assignment demo)."""
+    return render_template("index.html")
+
+
+@app.route("/_next/<path:subpath>")
+def next_static(subpath: str):
+    if not _web_export_ready():
+        return "Not Found", 404
+    return send_from_directory(WEB_EXPORT / "_next", subpath)
+
+
+@app.get("/maps.json")
+def maps_json_static():
+    if _web_export_ready() and (WEB_EXPORT / "maps.json").is_file():
+        return send_from_directory(WEB_EXPORT, "maps.json")
+    return jsonify(_load_maps())
 
 
 @app.get("/debug/headers")
