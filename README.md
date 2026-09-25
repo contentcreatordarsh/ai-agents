@@ -1,8 +1,26 @@
-# StrikeMap — Tactical Atlas + Live Ops
+# StrikeMap — real-world multiplayer + tactical edge stack
 
-Cloudflare SE assignment implementation on **strikemap.space**: tactical map trainer on **AWS EC2**, edge **Workers**, **Tunnel**, **Zero Trust** `/secure`, and private **R2** flags.
+**Tagline:** *Your city. Your battlefield.*
 
-**Live:** https://strikemap.space · https://tunnel.strikemap.space · https://strikemap.space/debug/headers
+| Component | Path | Description |
+|-----------|------|-------------|
+| **Game platform (primary)** | [`strikemap-platform/`](strikemap-platform/) | Cloudflare Workers, D1, Durable Objects, WebSockets, v1 API — **City Battle** MVP |
+| Map UI (Next.js) | [`web/`](web/) | Static map / demo feed (edge + EC2 export) |
+| SE assignment / origin | [`origin/`](origin/), [`worker-strikemap/`](worker-strikemap/) | EC2 Flask origin, gateway Worker, tunnel, `/secure` |
+
+**Live:** https://strikemap.space · https://tunnel.strikemap.space
+
+### Run the game platform locally
+
+```bash
+cd strikemap-platform
+npm install
+npm run db:migrate:local
+npm run dev
+# http://localhost:8787 — landing, /demo, /api/v1/*
+```
+
+**Push target repo:** https://github.com/contentcreatordarsh/strikemap — see [docs/PUSH_TO_STRIKEMAP.md](docs/PUSH_TO_STRIKEMAP.md) (agent needs repo write access).
 
 ## Quick start (local)
 
